@@ -9,7 +9,7 @@ environment:
   flutter: ">=1.19.0-6.0.pre.6"
 
 dependencies:
-  #
+  pedantic: 1.9.2
   flutter:
     sdk: flutter
 
