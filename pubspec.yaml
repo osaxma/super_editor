@@ -3,6 +3,7 @@ version: 0.0.1
 description: Rich Text Editor for Flutter - by Simon Lightfoot
 homepage: https://github.com/slightfoot/flutter_rich_text_editor
 repository: https://github.com/slightfoot/flutter_rich_text_editor
+documentation: https://rte.fluttercommunity.dev/
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
