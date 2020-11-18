@@ -76,8 +76,7 @@ class _RichTextEditorState extends State<RichTextEditor>
                             padding: const EdgeInsets.symmetric(vertical: 4.0),
                             decoration: BoxDecoration(
                               border: Border(
-                                bottom: BorderSide(
-                                    color: Colors.grey[200], width: 1.0),
+                                //bottom: BorderSide(color: Colors.grey[200], width: 1.0),
                               ),
                             ),
                             child: Builder(
@@ -112,7 +111,7 @@ class _RichTextEditorState extends State<RichTextEditor>
                       onTap: () => _controller.addNode(inPlaceInsert: false),
                       child: SizedBox(
                         height: 96.0,
-                        child: Placeholder(color: Colors.grey.shade300),
+                        //child: Placeholder(color: Colors.grey.shade300),
                       ),
                     ),
                   ),

@@ -6,11 +6,12 @@ repository: https://github.com/slightfoot/flutter_rich_text_editor
 documentation: https://rte.fluttercommunity.dev/
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=2.11.0-0.0.dev <3.0.0"
   flutter: ">=1.19.0-6.0.pre.6"
 
 dependencies:
   pedantic: 1.9.2
+  xml: 4.3.0
   flutter:
     sdk: flutter
 

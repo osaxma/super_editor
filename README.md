@@ -14,3 +14,7 @@
 
 ## How to save the content from the widget
 
+
+
+### Ticket regarding the need for a Rich Text Editor
+https://github.com/flutter/flutter/issues/12675

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:rich_text_editor/rich_text_editor.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(ExampleApp());
 }
 
+/// Demonstration app to show how to implement
+/// the RichTextEditor in a simple case.
 class ExampleApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -24,6 +25,8 @@ class ExampleApp extends StatelessWidget {
   }
 }
 
+/// Demonstration screen for RichTextEditor.
+/// This currently us used to test the focus handling within the view.
 class RichTextEditorExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
