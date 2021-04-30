@@ -16,6 +16,7 @@ import 'package:super_editor/src/infrastructure/attributed_spans.dart';
 import 'package:super_editor/src/infrastructure/attributed_text.dart';
 
 import 'document_interaction.dart';
+import 'document_interaction_mobile.dart';
 import 'document_keyboard_actions.dart';
 import 'layout.dart';
 import 'paragraph.dart';
@@ -288,7 +289,7 @@ class _SuperEditorState extends State<SuperEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return DocumentInteractor(
+    return DefaultDocumentInteractor(
       focusNode: _focusNode,
       scrollController: widget.scrollController,
       editContext: EditContext(
