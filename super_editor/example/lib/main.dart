@@ -13,6 +13,7 @@ import 'demos/demo_attributed_text.dart';
 import 'demos/demo_document_loses_focus.dart';
 import 'demos/demo_switch_document_content.dart';
 import 'package:example/demos/demo_toolbar.dart';
+import 'demos/demo_viewer.dart';
 
 /// Demo of a basic text editor, as well as various widgets that
 /// are available in this package.
@@ -147,6 +148,13 @@ final _menu = <_MenuGroup>[
         title: 'Toolbar Demo',
         pageBuilder: (context) {
           return ToolbarDemo();
+        },
+      ),
+      _MenuItem(
+        icon: Icons.description,
+        title: 'Viewer Demo',
+        pageBuilder: (context) {
+          return ExampleViewer();
         },
       ),
       _MenuItem(
