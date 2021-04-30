@@ -668,7 +668,7 @@ class _CursorPainter extends CustomPainter {
     required this.caretColor,
     required this.isTextEmpty,
     required this.showCaret,
-  })  : caretPaint = Paint()..color = caretColor,
+  })   : caretPaint = Paint()..color = caretColor,
         super(repaint: blinkController);
 
   final _CaretBlinkController blinkController;
