@@ -16,7 +16,7 @@ import 'package:super_editor/src/infrastructure/_logging.dart';
 import 'package:super_editor/src/infrastructure/multi_tap_gesture.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'document_interaction.dart' show DocumentInteractor, DocumentKeyboardAction, ExecutionInstruction, SelectionType;
+import 'document_interaction.dart' show DocumentInteractor, DocumentKeyboardAction, ExecutionInstruction;
 import 'text_tools.dart';
 
 final _log = Logger(scope: 'softkeyboard_document_interaction.dart');
@@ -180,7 +180,7 @@ class SoftKeyboardDocumentInteractor extends StatefulWidget {
   _SoftKeyboardDocumentInteractorState createState() => _SoftKeyboardDocumentInteractorState();
 }
 
-class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInteractor> {
+class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInteractor> implements TextInputClient {
   final _documentWrapperKey = GlobalKey();
 
   late FocusNode _focusNode;
@@ -358,69 +358,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     ).shift(_convertFromWrapperToDocument(Offset.zero));
   }
 
-  void _attachTextInputClientForSoftKeyboard() {
-    _textInputConnection = TextInput.attach(
-      TextInputClientForMobile(
-        onEvent: _onSoftKeyPressed,
-        onFloatingCursorStart: _onFloatingCursorStart,
-        onFloatingCursorUpdate: _onFloatingCursorUpdate,
-        onFloatingCursorEnd: _onFloatingCursorEnd,
-      ),
-      TextInputConfiguration(
-        inputAction: TextInputAction.newline,
-        inputType: TextInputType.text,
-        keyboardAppearance: Brightness.light,
-        enableSuggestions: false,
-        autocorrect: false,
-      ),
-    );
-    // set the initial value as zwsp to detect backspace
-    _textInputConnection.setEditingState(const TextEditingValue(
-      text: _zwsp,
-      selection: TextSelection(baseOffset: 1, extentOffset: 1),
-    ));
-  }
-
-  void _onSoftKeyPressed(RawKeyEvent event) {
-    _textInputConnection.setEditingState(const TextEditingValue(
-      text: _zwsp,
-      selection: TextSelection(baseOffset: 1, extentOffset: 1),
-    ));
-    _onKeyPressed(event);
-  }
-
-  void _onFloatingCursorStart() {
-    setState(() {
-      _floatingCursorInitialPosition = _convertFromDocumentToWrapper(_currentCursorPosition!);
-      // necessary to show the floating cursor before any updates.
-      _floatingCursorPosition = _floatingCursorInitialPosition;
-      _computeDocumentSize();
-    });
-  }
-
-  void _onFloatingCursorUpdate(Offset offset) {
-    setState(() {
-      _floatingCursorPosition = _floatingCursorInitialPosition! + offset;
-      final documentOffset = _convertFromWrapperToDocument(_floatingCursorPosition!);
-      _moveCaretTo(documentOffset);
-      _scrollIfNearBoundries(documentOffset);
-    });
-  }
-
-  void _onFloatingCursorEnd() {
-    setState(() {
-      _floatingCursorInitialPosition = null;
-      _floatingCursorPosition = null;
-    });
-  }
-
-  void _moveCaretTo(Offset documentOffset) {
-    final docPosition = _layout.getDocumentPositionNearestToOffset(documentOffset);
-    if (docPosition != null) {
-      _selectPosition(docPosition);
-    }
-  }
-
   void _onFocusChange() {
     if (_focusNode.hasFocus && widget.editContext.composer.selection != null) {
       if (!_textInputConnection.attached) {
@@ -451,7 +388,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   void _onSelectionChange() {
     _log.log('_onSelectionChange', 'EditableDocument: _onSelectionChange()');
-
     // while most cases do not require a post frame call back, there are two cases that's requires
     // calling `_updateDragHandles` in a post frame to place drag handles appropriately:
     //   1- when a text node changes alignment while there's a selection.
@@ -485,10 +421,16 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   }
 
   void _onTapDown(TapDownDetails details) {
-    if (_isInsideDragHandle(details.globalPosition)) return;
+    if (_isInsideDragHandle(details.globalPosition)) {
+      //  for debugging to test region selection by tapping on the drag handle.
+      // _selectRegion(
+      //   documentLayout: _layout,
+      //   baseOffset: _convertFromWrapperToDocument(_baseDragHandleRect!.center).translate(0, 5),
+      //   extentOffset: _convertFromWrapperToDocument(_extentDragHandleRect!.center).translate(0, 5),
+      // );
+      return;
+    }
     _log.log('_onTapDown', 'EditableDocument: onTapDown()');
-    // _clearSelection();
-    // _selectionType = SelectionType.position;
 
     final docOffset = _getDocOffset(details.localPosition);
     _log.log('_onTapDown', ' - document offset: $docOffset');
@@ -506,7 +448,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   void _onDoubleTapDown(TapDownDetails details) {
     if (_isInsideDragHandle(details.globalPosition)) return;
-    // _selectionType = SelectionType.word;
 
     _log.log('_onDoubleTapDown', 'EditableDocument: onDoubleTap()');
     _clearSelection();
@@ -530,13 +471,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     _focusNode.requestFocus();
   }
 
-  void _onDoubleTap() {
-    // _selectionType = SelectionType.position;
-  }
-
   void _onTripleTapDown(TapDownDetails details) {
     if (_isInsideDragHandle(details.globalPosition)) return;
-    // _selectionType = SelectionType.paragraph;
 
     _log.log('_onTripleTapDown', 'EditableDocument: onTripleTapDown()');
     _clearSelection();
@@ -558,10 +494,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
 
     _focusNode.requestFocus();
-  }
-
-  void _onTripleTap() {
-    // _selectionType = SelectionType.position;
   }
 
   void _onLongPress() {
@@ -605,9 +537,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     required DocumentLayout documentLayout,
     required Offset baseOffset,
     required Offset extentOffset,
-    required SelectionType selectionType,
   }) {
-    _log.log('_selectionRegion', 'Composer: selectionRegion(). Mode: $selectionType');
+    _log.log('_selectionRegion', 'Composer: selectionRegion(). Mode: Position');
     var selection = documentLayout.getDocumentSelectionInRegion(baseOffset, extentOffset);
     var basePosition = selection?.base;
     var extentPosition = selection?.extent;
@@ -617,48 +548,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       return;
     }
 
-    if (selectionType == SelectionType.paragraph) {
-      final baseParagraphSelection = getParagraphSelection(
-        docPosition: basePosition,
-        docLayout: documentLayout,
-      );
-      if (baseParagraphSelection == null) {
-        widget.editContext.composer.selection = null;
-        return;
-      }
-      basePosition = baseOffset.dy < extentOffset.dy ? baseParagraphSelection.base : baseParagraphSelection.extent;
-
-      final extentParagraphSelection = getParagraphSelection(
-        docPosition: extentPosition,
-        docLayout: documentLayout,
-      );
-      if (extentParagraphSelection == null) {
-        widget.editContext.composer.selection = null;
-        return;
-      }
-      extentPosition =
-          baseOffset.dy < extentOffset.dy ? extentParagraphSelection.extent : extentParagraphSelection.base;
-    } else if (selectionType == SelectionType.word) {
-      _log.log('_selectionRegion', ' - selecting a word');
-      final baseWordSelection = getWordSelection(
-        docPosition: basePosition,
-        docLayout: documentLayout,
-      );
-      if (baseWordSelection == null) {
-        widget.editContext.composer.selection = null;
-        return;
-      }
-      basePosition = baseWordSelection.base;
-
-      final extentWordSelection = getWordSelection(
-        docPosition: extentPosition,
-        docLayout: documentLayout,
-      );
-      if (extentWordSelection == null) {
-        widget.editContext.composer.selection = null;
-        return;
-      }
-      extentPosition = extentWordSelection.extent;
+    // to prevent hiding the drag handles when base == extent
+    if (_isDragging && selection!.isCollapsed) {
+      return;
     }
 
     widget.editContext.composer.selection = (DocumentSelection(
@@ -714,9 +606,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
 
     // in document coordinates..
-    _currentCursorPosition = _layout.getRectForPosition(selection.extent)?.topLeft;
-    // this return the offset within the component
-    // text is still not factoring line height (see default_deitor/text.dart#_TextComponentState#getRectForPosition)
+    _currentCursorPosition = _layout.getRectForPosition(selection.extent)?.center;
+
     late final Offset? selectionTopLeft;
     late final Offset? selectionBottomRight;
 
@@ -724,6 +615,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       selectionTopLeft = _currentCursorPosition;
       selectionBottomRight = _currentCursorPosition;
     } else {
+      // text is still not factoring line height (see default_deitor/text.dart#_TextComponentState#getRectForPosition)
       selectionTopLeft = _layout.getRectForPosition(selection.base)?.topLeft;
       selectionBottomRight = _layout.getRectForPosition(selection.extent)?.bottomRight;
     }
@@ -749,6 +641,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                             SELECTION CONTROLS                             */
+  /* -------------------------------------------------------------------------- */
+
   void showSelectionControls() {
     if (_baseDragHandleRect == null || _extentDragHandleRect == null) return;
     final baseOffset = _convertFromWrapperToGlobal(_baseDragHandleRect!.center);
@@ -760,8 +656,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     // - base before extent in multiline
     // - base after extent in multiline
 
-    late final double dx;
-    late final double dy;
+    double dx;
+    double dy;
     final screenWidth = MediaQuery.of(context).size.width;
 
     if (baseOffset.dy == extentOffset.dy) {
@@ -782,67 +678,70 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       // alternatively:
       // dx = extentOffset.dx + layoutTopLeft.dx + 20;
     }
+    // final topPadding = MediaQuery.of(context).padding.top;
+    dy = max(dy, max(_interactorTopLeft.dy, MediaQuery.of(context).padding.top));
 
     selectionControls.show(
-      context,
-      Offset(
-        dx,
-        max(dy, _interactorTopLeft.dy),
-      ),
-      onCopy: _isSelectionCollapsed
-          ? null
-          : () {
-              copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
-              selectionControls.hide();
-            },
-      onSelectAll: () {
-        selectAllWhenCmdAIsPressed(editContext: widget.editContext, keyEvent: selectAllKeyEvent);
-
-        // to move the selection controls in the new proper position.
-        selectionControls.hide();
-        showSelectionControls();
-      },
-      onCut: widget.readOnly || _isSelectionCollapsed
-          ? null
-          : () {
-              // copy the text
-              copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
-              // delete the text
-              deleteExpandedSelectionWhenCharacterOrDestructiveKeyPressed(
-                  editContext: widget.editContext, keyEvent: backspaceKeyEvent);
-              selectionControls.hide();
-            },
-      onPaste: widget.readOnly
-          ? null
-          : () {
-              pasteWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: pasteKeyEvent);
-            },
+      context: context,
+      topCenter: Offset(dx, max(dy, _interactorTopLeft.dy)),
+      onCopy: _isSelectionCollapsed ? null : _onCopy,
+      onSelectAll: _onSelectAll,
+      onCut: widget.readOnly || _isSelectionCollapsed ? null : _onCut,
+      onPaste: widget.readOnly ? null : _onPaste,
     );
   }
 
+  void _onCopy() {
+    copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
+    selectionControls.hide();
+  }
+
+  void _onCut() {
+    // copy the text
+    copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
+    // delete the text
+    deleteExpandedSelectionWhenCharacterOrDestructiveKeyPressed(
+        editContext: widget.editContext, keyEvent: backspaceKeyEvent);
+    selectionControls.hide();
+  }
+
+  void _onSelectAll() {
+    selectAllWhenCmdAIsPressed(editContext: widget.editContext, keyEvent: selectAllKeyEvent);
+    // to move the selection controls in the new proper position.
+    selectionControls.hide();
+    showSelectionControls();
+  }
+
+  void _onPaste() {
+    pasteWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: pasteKeyEvent);
+  }
+
+  // TODO: replicate behavior from DocumentInteractor
+  final _autoScrollArea = 50;
+  final _scrollAmount = 10;
   // pass the document offset to scroll if necessary.
   //
   // This is mainly used by the drag handles and floating cursor when either the
   // selection or floating curosr is near the upper or lower boundries.
   void _scrollIfNearBoundries(Offset documentOffset) {
     final scrollOffset = _scrollController.offset;
-    if (documentOffset.dy - 20 < _documentViewportRect.top) {
+    if (documentOffset.dy - _autoScrollArea < _documentViewportRect.top) {
       // don't scroll beyond begining
       if (scrollOffset <= 0) return;
-      _scrollController.animateTo(
-        scrollOffset - 40,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
+      _scrollController.jumpTo(
+        scrollOffset - _scrollAmount,
+        // duration: const Duration(milliseconds: 100),
+        // curve: Curves.easeOut,
       );
       return;
     }
-    if (documentOffset.dy > _documentViewportRect.bottom - 20) {
+    if (documentOffset.dy > _documentViewportRect.bottom - _autoScrollArea) {
       // don't scroll beyond end
       if (scrollOffset >= _scrollController.position.maxScrollExtent) return;
-      _scrollController.animateTo(
-        scrollOffset + 40,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
+      _scrollController.jumpTo(
+        scrollOffset + _scrollAmount,
+        // duration: const Duration(milliseconds: 100),
+        // curve: Curves.easeOut,
       );
       return;
     }
@@ -885,9 +784,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
             recognizer
               ..onTapDown = _onTapDown
               ..onDoubleTapDown = _onDoubleTapDown
-              ..onDoubleTap = _onDoubleTap
-              ..onTripleTapDown = _onTripleTapDown
-              ..onTripleTap = _onTripleTap;
+              ..onTripleTapDown = _onTripleTapDown;
           },
         ),
         LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
@@ -909,27 +806,41 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
           _computeDocumentSize();
         },
         onPanUpdate: (details) {
-          // not sure why this value becomes null when: - select the word 'Example' on header, drag the extent handle right or left
+          // just in case
           if (_extentDragHandleRect == null || _baseDragHandleRect == null) {
-            print(
-                'ISNULL: extentDragHandleRect! = $_extentDragHandleRect! && baseDragHandleRect! $_baseDragHandleRect!');
+            print('extentDragHandleRect! = $_extentDragHandleRect! && baseDragHandleRect! $_baseDragHandleRect!');
             return;
           }
-          // use global since we need to take scroll offset into account.
-          final documentOffset = _convertFromGlobalToDocument(details.globalPosition);
+          // when the drag handles are near the document borders, their position can be outside the document boundries
+          // which will cause `_selectRegion` to return a null selection. To avoid such case, we clamp the drag handles
+          // positions to be slightly larger than lower boundries and slightly lower than the upper boundries.
+          // using +1 or -1 seems to work fine, lower numbers may work too but 1 seems reasonable.
+          final dx = details.globalPosition.dx.clamp(
+            _documentTopLeft.dx + 1,
+            _documentTopLeft.dx + _documentSize.width - 1,
+          );
+
+          final dy = details.globalPosition.dy.clamp(
+            _documentTopLeft.dy - _scrollController.offset + 1,
+            _documentTopLeft.dy - _scrollController.offset + _documentSize.height - 1,
+          );
+          final documentOffset = _convertFromGlobalToDocument(Offset(dx, dy));
+          // final documentOffset = _convertFromGlobalToDocument(details.globalPosition);
           if (isBase) {
             _selectRegion(
               documentLayout: _layout,
-              baseOffset: documentOffset,
-              extentOffset: _convertFromWrapperToDocument(_extentDragHandleRect!.center),
-              selectionType: SelectionType.position,
+              baseOffset: documentOffset.translate(0, 5),
+              // since the text height is not included in _extentDragHandleRect, for larger fonts (e.g. header1, header2),
+              // the top position can move the selection one line up. We need to translate the position to be below
+              // the top boundry of the text height. While 5 is an arbitary number, it was tested on header1, 2, and 3.
+              extentOffset: _convertFromWrapperToDocument(_extentDragHandleRect!.center).translate(0, 5),
             );
           } else {
             _selectRegion(
               documentLayout: _layout,
-              baseOffset: _convertFromWrapperToDocument(_baseDragHandleRect!.center),
-              extentOffset: documentOffset,
-              selectionType: SelectionType.position,
+              // see note above
+              baseOffset: _convertFromWrapperToDocument(_baseDragHandleRect!.center).translate(0, 5),
+              extentOffset: documentOffset.translate(0, 5),
             );
           }
 
@@ -948,8 +859,16 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
         onPanEnd: (details) {
           setState(() {
             _isDragging = false;
-            // to remove drag handles if selection is cancelled & collapsed
-            _updateDragHandles();
+            // when selection is TextSelection where base.nodePosition.offset == extent.nodePosition.offset, but
+            // base.nodePosition.affinity != extent.nodePosition.affinity. In such case, selection.isCollapsed == false,
+            // although technically it's collapsed. This will make sure to collapse the selection.
+            if (_baseDragHandleRect?.center == _extentDragHandleRect?.center) {
+              // collapse the selection
+              _selectPosition(widget.editContext.composer.selection!.base);
+            } else {
+              // to show selection controls if necessary.
+              _updateDragHandles();
+            }
           });
         },
         child: Container(
@@ -1012,34 +931,41 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       ),
     );
   }
-}
 
-/* -------------------------------------------------------------------------- */
-/*                          SOFT KEYBOARD CLIENT                              */
-/* -------------------------------------------------------------------------- */
-// The implementation below was made in a way to satisfy the current API without making any changes.
-//
-// In other words, input data and actions from the softkeyboard are converted into a RawKeyEvent.
-// Since soft keyboards events are not triggered by `RawKeyboardListener` (because they are not really 'events'),
-// the following TextInputClient is used to transform the input data and actions into.
-//
-// TODO: add this implementation to the state similar to EditibaleText.
-class TextInputClientForMobile extends TextInputClient {
-  final ValueChanged<RawKeyEvent> onEvent;
-  final VoidCallback? onFloatingCursorStart;
-  final ValueChanged<Offset> onFloatingCursorUpdate;
-  final VoidCallback? onFloatingCursorEnd;
+  /* -------------------------------------------------------------------------- */
+  /*                      TEXT INPUT CLIENT IMPLEMENTATION                      */
+  /* -------------------------------------------------------------------------- */
 
-  TextInputClientForMobile({
-    required this.onEvent,
-    required this.onFloatingCursorUpdate,
-    this.onFloatingCursorStart,
-    this.onFloatingCursorEnd,
-  });
+  void _attachTextInputClientForSoftKeyboard() {
+    _textInputConnection = TextInput.attach(this, _createTextInputConfiguration());
+    // set the initial value as zwsp to detect backspace
+    _textInputConnection.setEditingState(const TextEditingValue(
+      text: _zwsp,
+      selection: TextSelection(baseOffset: 1, extentOffset: 1),
+    ));
+  }
 
-  // TODO need to clean current client connection
-  // see implementation in EditableText
+  void _onSoftKeyPressed(RawKeyEvent event) {
+    _textInputConnection.setEditingState(const TextEditingValue(
+      text: _zwsp,
+      selection: TextSelection(baseOffset: 1, extentOffset: 1),
+    ));
+    _onKeyPressed(event);
+  }
+
+  TextInputConfiguration _createTextInputConfiguration() {
+    // [bool needsAutofillConfiguration = false]
+    return TextInputConfiguration(
+      inputAction: TextInputAction.newline,
+      inputType: TextInputType.text,
+      keyboardAppearance: Brightness.light,
+      enableSuggestions: false,
+      autocorrect: false,
+    );
+  }
+
   @override
+  // TODO: implement connectionClosed
   void connectionClosed() {}
 
   @override
@@ -1049,12 +975,11 @@ class TextInputClientForMobile extends TextInputClient {
   }
 
   @override
+  // TODO: implement currentTextEditingValue
   TextEditingValue? get currentTextEditingValue {
     return TextEditingValue.empty;
   }
 
-  // the action here depends on how [TextInputConfiguration] is configured.
-  // for example, if TextInputConfiguration.textInputAction == TextInputAction.newline,
   @override
   void performAction(TextInputAction action) {
     switch (action) {
@@ -1071,20 +996,21 @@ class TextInputClientForMobile extends TextInputClient {
       case TextInputAction.route:
       case TextInputAction.emergencyCall:
       case TextInputAction.newline:
-        onEvent.call(newLineKeyEvent);
+        _onSoftKeyPressed(newLineKeyEvent);
         break;
     }
   }
 
-  // this looks like to be an android specific method
   @override
-  void performPrivateCommand(String action, Map<String, dynamic> data) {}
+  void performPrivateCommand(String action, Map<String, dynamic> data) {
+    // TODO: implement performPrivateCommand
+  }
 
-  // TODO: figure out how to integrate this or if it's even needed.
   @override
-  void showAutocorrectionPromptRect(int start, int end) {}
+  void showAutocorrectionPromptRect(int start, int end) {
+    // TODO: implement showAutocorrectionPromptRect
+  }
 
-  // this does not support voice input since things come in chunks and may need some sort of feedback
   @override
   void updateEditingValue(TextEditingValue value) {
     if (value.text.contains('\n')) {
@@ -1109,32 +1035,61 @@ class TextInputClientForMobile extends TextInputClient {
     // the second condition is to ensure that it was a deletion event and not hold-press on spacebar
     if (value.text.isEmpty) {
       // another option:  (value.text.length == 1 && value.selection.base != value.selection.extent)
-      onEvent.call(backspaceKeyEvent);
+      _onSoftKeyPressed(backspaceKeyEvent);
     } else if (value.text.length > 1) {
       // since we are adding zwsp, any string with 2 chars or more (emojis and whatnot) means a character input
       final text = value.text.replaceAll(_zwsp, '');
       final event = SoftRawKeyDownEvent(data: CharacterKeyEventData(text));
-      onEvent.call(event);
+      _onSoftKeyPressed(event);
     }
   }
 
-  // in iOS, this will give the location of the floating cursor*.
-  //
-  // * the floating cursor appears in iOS when a user press and hold on the space bar and move the cursor
-  // not sure if there is anything similar in Android.
+  void _ensureFloatingCursorIsVisibleOnStart() {
+    if (_currentCursorPosition != null && !_documentViewportRect.contains(_currentCursorPosition!)) {
+      // adjust the viewport so the cursor is shown at its center.
+      final double offset = _scrollController.offset + _currentCursorPosition!.dy - _documentViewportRect.center.dy;
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeIn,
+      );
+    }
+  }
+
+  void _moveCaretTo(Offset documentOffset) {
+    final docPosition = _layout.getDocumentPositionNearestToOffset(documentOffset);
+    if (docPosition != null) {
+      _selectPosition(docPosition);
+    }
+  }
+
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
     switch (point.state) {
       case FloatingCursorDragState.Start:
-        onFloatingCursorStart?.call();
+        setState(() {
+          _floatingCursorInitialPosition = _convertFromDocumentToWrapper(_currentCursorPosition!);
+          // necessary to show the floating cursor before any updates.
+          _floatingCursorPosition = _floatingCursorInitialPosition;
+          _computeDocumentSize();
+          _ensureFloatingCursorIsVisibleOnStart();
+        });
         break;
       case FloatingCursorDragState.Update:
         if (point.offset != null) {
-          onFloatingCursorUpdate(point.offset!);
+          setState(() {
+            _floatingCursorPosition = _floatingCursorInitialPosition! + point.offset!;
+            final documentOffset = _convertFromWrapperToDocument(_floatingCursorPosition!);
+            _moveCaretTo(documentOffset);
+            _scrollIfNearBoundries(documentOffset);
+          });
         }
         break;
       case FloatingCursorDragState.End:
-        onFloatingCursorEnd?.call();
+        setState(() {
+          _floatingCursorInitialPosition = null;
+          _floatingCursorPosition = null;
+        });
         break;
     }
   }
@@ -1308,9 +1263,9 @@ class SelectionControlsOverlay {
   // instead of having canCopy, canPaste, etc.
   // also passing this here instead of the constructor because the selection controls
   // might be different based on the selection...
-  void show(
-    BuildContext context,
-    Offset topCenter, {
+  void show({
+    required BuildContext context,
+    required Offset topCenter,
     VoidCallback? onCut,
     VoidCallback? onCopy,
     VoidCallback? onPaste,
