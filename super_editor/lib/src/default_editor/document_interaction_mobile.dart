@@ -2,6 +2,8 @@
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:diff_match_patch/diff_match_patch.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide SelectableText;
@@ -67,94 +69,6 @@ class DefaultDocumentInteractor extends StatelessWidget {
     }
   }
 }
-
-// General Notes:
-//
-//
-// ### Interactor + Layout:
-// - documentInteractor contains documentLayout which contains the actual document
-// - the documentInteractor can take the entire available width while the document layout is limited to the max width
-//   that is set by the editor.
-// - the documentLayout also has a padding around it.
-// - when calling _getDocOffset, we get the x,y coordinates inside in the document/layout coordinates which
-//   does not account for padding since it's outside the document and its layout.
-// - When we want to place the drag handles or show the floating cursor, we cannot place them inside the document since
-//   the document layout is passed as a child to the interactor with the padding around it.
-// - So technically, the drag handles and floating cursor are placed above the layout + padding
-//   (ie document wrapper which is a SizedBox).
-// - To place the drag handles correctly, we need to know the topLeft position of the layout as well as the wrapper
-//   (i.e. in global coordinates, wrapperTopLeft - layoutTopLeft == layoutPadding)
-// - here's a simplified view of the situation.
-//
-//            _________________________ toolbar/appbar _____________________
-//            |                                                            |
-//            |________________________   interactor   ____________________|
-//            |     ___________________     wrapper    ________________    |
-//            |    |                                                   |   |
-//            |    |    _______________ documentlayout  ____________   |   |
-//            |    |   |                                            |  |   |
-//            |    |   ┤~~~~~~~~~~   minWidth ~ maxWidth ~~~~~~~~~~~├  |   |
-//            |    |   |                                            |  |   |
-//            ┤~~~~~~~~~~~~~~~~~~~~   screen width ~~~~~~~~~~~~~~~~~~~~~~~~├
-//
-//    As seen above, the interactor can take whatever avaialble width and height.
-//    Typically the top padding has the same `top` position as the interactor.
-//    On the other hand, assuming the layout max width < screen width, the `left`
-//    position of the padding will be greater than that of the interactor.
-//
-//    Since the document, its layout and padding are given as a child to the interactor,
-//    placing drag handles relies on the padding's topLeft as origin.
-//    Hence whenever we're getting coordinates from the document (ie _getDocOffset), we need to
-//    account for the padding offset.
-//
-//    The good thing is that in a mobile application, the screen width is constant, so most
-//    of these values can be computed in the initState. While in Mobile, it's most likely that
-//    the padding x,y will be equal to the interactors x,y, the case can be different for tablets.
-//
-//    Since we're placing draghandles directly on the widget containing the padding/layout,
-//    the scroll offset is ignored when positining the handles. Though the scroll offset must
-//    be taken into account when dealing global position*.
-//
-//    * global position is preferred to avoid a converting mess between the different coordinates.
-//
-//    to summarize:
-//    - draghandles uses document coordinates with padding's as an offset (ie padding's coordinates)
-//    - selection controls can use either screen coordinates or can be enclosed in interactor's coordinates.
-//
-// #### Selection Controls
-// for selection controls widget/painter, see:
-// - material: flutter/lib/src/material/text_selection.dart -- MaterialTextSelectionControls
-// - cupertino: flutter/lib/src/cupertino/text_selection.dart -- CupertinoTextSelectionControls
-//
-// For floating cursor and other behavior, see EditableText implementation:
-// - flutter/lib/src/widgets/editable_text.dart
-//
-// ### TODOs:
-//  - selection of text with header has an issue
-//     => double tap a header word to be selected, drag the handle left or right and selection gets lost.
-//  - Understand the TextInputClient for different platformts to implement autocorrect/suggestion
-//  - Replace RawKeyEvent wrappers with commands since we don't really need to mimic keyboard events
-//    (initially i didn't know better)
-//  - resolve conflict between scroll gesture and vertical drag of draghandle.
-//    => when dragging a drag handle vertically, it'll scroll while it shouldn't.
-//  - floating cursor height should adapt based on the selection height or caret height.
-//  - add logging in a similar approach to the rest of this code base
-//  - add any necessary testing in a similar approach to the rest of this code base.
-//
-// waiting from upstream:
-//  - provide text height when calling `_layout.getRectForPosition`
-//    => this is important since we're currently placing both extent and base drag handles at the same level
-//       ideally the left handle should be on the top left of the selection while the right handle should be
-//       on the button right of the selection. Also, in iOS at least, the drag handle has a line that extends
-//       to the other end.
-//
-//
-// to keep in mind:
-//  - a lot of functionalities here were copied from documentInteractor so they should be consolidated if this
-//    is will get merged.
-
-// Unlike io.Platform, TargetPlatform, from the foundation library, detects the operating system on web.
-// hence, a softkeyboard is only true when the device is iOS or Android whether it's a native app or a Web app.
 
 /// a document interactor for touch devices with softkeyboard
 class SoftKeyboardDocumentInteractor extends StatefulWidget {
@@ -253,7 +167,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     _scrollController =
         _scrollController = (widget.scrollController ?? ScrollController())..addListener(_computeDocumentViewPort);
 
-    widget.editContext.composer.addListener(_onSelectionChange);
+    widget.editContext.composer.addListener(() {
+      // for some reason this method is being called three times each time a selection changes.
+      _onSelectionChange();
+    });
 
     if (!widget.readOnly) {
       _attachTextInputClientForSoftKeyboard();
@@ -386,7 +303,14 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
+  DocumentSelection? _previousSelection;
   void _onSelectionChange() {
+    // for some reason on every selection change, this function is being called three times 
+    // hence we cache it to avoid repeating computations. 
+    if (_previousSelection == widget.editContext.composer.selection) {
+      return;
+    }
+    _previousSelection = widget.editContext.composer.selection;
     _log.log('_onSelectionChange', 'EditableDocument: _onSelectionChange()');
     // while most cases do not require a post frame call back, there are two cases that's requires
     // calling `_updateDragHandles` in a post frame to place drag handles appropriately:
@@ -398,7 +322,69 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
         _updateDragHandles();
       });
     });
+    _updateCurrentSelection();
   }
+
+  TextNode? _currentSelectedTextNode;
+  TextEditingValue _localTextEditingValue = _zwspEditingValue;
+  void _updateCurrentSelection() {
+    if (_isFloatingCursorActive || _isDragging) {
+      // it's unncessary and computationally expensive to update during these activity.
+      //  Though but both activity should trigger this method once they're done.
+      return;
+    }
+    final selection = widget.editContext.composer.selection;
+    if (selection == null) {
+      _localTextEditingValue = _zwspEditingValue;
+      _currentSelectedTextNode = null;
+      _setEditingState();
+      return;
+    }
+
+    final selectedNodes = widget.editContext.editor.document.getNodesInside(selection.base, selection.extent);
+
+    if (selectedNodes.length > 1 || selectedNodes.first is! TextNode) {
+      _localTextEditingValue = _zwspEditingValue;
+      _currentSelectedTextNode = null;
+    } else {
+      _currentSelectedTextNode = selectedNodes.first as TextNode;
+      _localTextEditingValue = TextEditingValue(
+        text: _zwsp + _currentSelectedTextNode!.text.text,
+        selection: TextSelection(
+          baseOffset: (selection.base.nodePosition as TextPosition).offset + 1, // +1 for _zwsp
+          extentOffset: (selection.extent.nodePosition as TextPosition).offset + 1, // +1 for _zwsp
+        ),
+      );
+    }
+    if (!_isUpdatingEditingValue) {
+      _setEditingState();
+    } else {}
+  }
+
+  void _setEditingState() {
+    // temp
+    if (!_textInputConnection.attached) {
+      // should we connect and reinvoke _setEditingState?
+      return;
+    }
+
+    // calling _textInputConnection.setEditingState should be avoided when the remote value equals the
+    // local value. Doing otherwise, can interrupt user activity such as voice dictation and also it can
+    // emit unncessary updates.
+    if (_didRemoteTextEditingValueChange) {
+      _textInputConnection.setEditingState(_localTextEditingValue);
+      _lastKnownRemoteTextEditingValue = _localTextEditingValue;
+    }
+  }
+
+  // using _currentTextEditingValue == _lastKnownRemoteTextEditingValue directly is avoided since it compares
+  // affinity which was observed to be inaccurate and also it does not apply to the use case here since
+  // the differences in text and selection are only what matter.
+  bool get _didRemoteTextEditingValueChange =>
+      _lastKnownRemoteTextEditingValue == null ||
+      _lastKnownRemoteTextEditingValue!.text != _localTextEditingValue.text ||
+      _lastKnownRemoteTextEditingValue!.selection.base.offset != _localTextEditingValue.selection.base.offset ||
+      _lastKnownRemoteTextEditingValue!.selection.extent.offset != _localTextEditingValue.selection.extent.offset;
 
   KeyEventResult _onKeyPressed(RawKeyEvent keyEvent) {
     _log.log('_onKeyPressed', 'keyEvent: ${keyEvent.character}');
@@ -422,7 +408,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   void _onTapDown(TapDownDetails details) {
     if (_isInsideDragHandle(details.globalPosition)) {
-      //  for debugging to test region selection by tapping on the drag handle.
+      //  the code below is for debugging to test region selection by tapping on the drag handle.
       // _selectRegion(
       //   documentLayout: _layout,
       //   baseOffset: _convertFromWrapperToDocument(_baseDragHandleRect!.center).translate(0, 5),
@@ -869,6 +855,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
               // to show selection controls if necessary.
               _updateDragHandles();
             }
+            _updateCurrentSelection();
           });
         },
         child: Container(
@@ -938,19 +925,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   void _attachTextInputClientForSoftKeyboard() {
     _textInputConnection = TextInput.attach(this, _createTextInputConfiguration());
-    // set the initial value as zwsp to detect backspace
-    _textInputConnection.setEditingState(const TextEditingValue(
-      text: _zwsp,
-      selection: TextSelection(baseOffset: 1, extentOffset: 1),
-    ));
-  }
-
-  void _onSoftKeyPressed(RawKeyEvent event) {
-    _textInputConnection.setEditingState(const TextEditingValue(
-      text: _zwsp,
-      selection: TextSelection(baseOffset: 1, extentOffset: 1),
-    ));
-    _onKeyPressed(event);
+    _textInputConnection.setEditingState(_localTextEditingValue);
   }
 
   TextInputConfiguration _createTextInputConfiguration() {
@@ -958,9 +933,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     return TextInputConfiguration(
       inputAction: TextInputAction.newline,
       inputType: TextInputType.text,
-      keyboardAppearance: Brightness.light,
-      enableSuggestions: false,
-      autocorrect: false,
+      // keyboardAppearance: Theme.of(context).brightness,
+      enableSuggestions: true,
+      autocorrect: true,
     );
   }
 
@@ -977,6 +952,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   @override
   // TODO: implement currentTextEditingValue
   TextEditingValue? get currentTextEditingValue {
+    print('get currentTextEditingValue');
     return TextEditingValue.empty;
   }
 
@@ -996,7 +972,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       case TextInputAction.route:
       case TextInputAction.emergencyCall:
       case TextInputAction.newline:
-        _onSoftKeyPressed(newLineKeyEvent);
+        // since we are specifically using 'TextInputAction.newline',
+        // handling the action may not be necessary since a new line
+        // will be handled by update Editing Value.
+        // _onKeyPressed(newLineKeyEvent);
         break;
     }
   }
@@ -1004,47 +983,119 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   @override
   void performPrivateCommand(String action, Map<String, dynamic> data) {
     // TODO: implement performPrivateCommand
+    print('performPrivateCommand');
   }
 
   @override
   void showAutocorrectionPromptRect(int start, int end) {
     // TODO: implement showAutocorrectionPromptRect
+    print('showAutocorrectionPromptRect');
   }
 
+  TextEditingValue? _lastKnownRemoteTextEditingValue;
+  // when true, _setEditingState should not be invoked.
+  bool _isUpdatingEditingValue = false;
   @override
   void updateEditingValue(TextEditingValue value) {
-    if (value.text.contains('\n')) {
-      if (value.text.length == 2) {
-        // it's handled by the performAction
-        return;
-      } else {
-        // for some reason the newline gets carried to the next event
-        // and it's not being reset by the texteditingvalue that onEvent does
-        value = value.copyWith(text: value.text.replaceAll('\n', ''));
-      }
-    }
+    _lastKnownRemoteTextEditingValue = value;
 
-    // for some reason after the a backspace event (length == 1 and value == zwsp), an empty event is sent.
-    // similarly, when the spacebar is hold for updateFloatingCursor, an empty value event is called
-    // (it could be different for when there's a selection though)
-    if (value.text == _zwsp) {
+    // when the floating cursor is moving, this method gets called but it should be ignored since 
+    // we are handling the floating cursor activity elsewhere 
+    if (!_didRemoteTextEditingValueChange || _isFloatingCursorActive) {
+      return;
+    }
+    // backspace at the begining of the TextNode
+    if (!value.text.contains(_zwsp)) {
+      _onKeyPressed(backspaceKeyEvent);
+      // this is necessary for list item since deletion converts it into paragraph without triggering a 
+      // selection change.  
+      _updateCurrentSelection();
       return;
     }
 
-    // this means there's only the zwsp character and it's an indicator of a backspace event
-    // the second condition is to ensure that it was a deletion event and not hold-press on spacebar
-    if (value.text.isEmpty) {
-      // another option:  (value.text.length == 1 && value.selection.base != value.selection.extent)
-      _onSoftKeyPressed(backspaceKeyEvent);
-    } else if (value.text.length > 1) {
-      // since we are adding zwsp, any string with 2 chars or more (emojis and whatnot) means a character input
-      final text = value.text.replaceAll(_zwsp, '');
-      final event = SoftRawKeyDownEvent(data: CharacterKeyEventData(text));
-      _onSoftKeyPressed(event);
+    // since soft return (ie shift+enter) is technically not supported in mobile, [TextNode]s won't contain
+    // newline as part of the text, and hence it's considered newLineKeyEvent
+    if (value.text.contains('\n')) {
+      _onKeyPressed(newLineKeyEvent);
+      return;
     }
+
+    _isUpdatingEditingValue = true;
+    // _currentSelectedTextNode being null indicates either the current selection isn't a TextNode
+    // or the current selection spans across multiple textNodes. In such case, the raw characters
+    // are sent as they are since textEditingValue should be = _zwspTextEditingValue + typed-characters.
+    // Given that the value is _zwspTextEditingValue, there won't be autocorrect or suggetion for this case.
+    if (_currentSelectedTextNode == null) {
+      final newText = value.text.replaceAll(_zwsp, '');
+      newText.runes.forEach((rune) {
+        final event = SoftRawKeyDownEvent(data: CharacterKeyEventData(String.fromCharCode(rune)));
+        _onKeyPressed(event);
+      });
+    } else {
+      _applyRemoteChanges();
+    }
+    _isUpdatingEditingValue = false;
   }
 
-  void _ensureFloatingCursorIsVisibleOnStart() {
+  // remote changes don't come in any specific order. A word can be replaced, a character can be added or removed
+  // or part of the word can change only, mainly due to autocorrect or suggestions.
+  void _applyRemoteChanges() {
+    final localText = _localTextEditingValue.text.replaceFirst(_zwsp, '');
+    final remoteText = _lastKnownRemoteTextEditingValue!.text.replaceFirst(_zwsp, '');
+
+    // find the difference between the new value and previous value.
+    final differences = diff(localText, remoteText);
+
+    if (differences.length == 1) {
+      // there's no difference in this case.
+      return;
+    }
+
+    // after a character is inserted, the selection should be collapsed, hence base == extent
+    final cursorOffset = _lastKnownRemoteTextEditingValue!.selection.extentOffset - 1; // -1 for _zwsp removal
+
+    int currentOffset = 0;
+
+    // get a copy of the attributed text to prevent listeners from unnecessarly being notified
+    // which may cause undesirable behavior.
+    var attributedText = _currentSelectedTextNode!.text.copyText(0);
+
+    for (var difference in differences) {
+      if (difference.operation == DIFF_EQUAL) {
+        currentOffset += difference.text.length;
+        continue;
+      }
+
+      if (difference.operation == DIFF_DELETE) {
+        attributedText = attributedText.removeRegion(
+          startOffset: currentOffset,
+          endOffset: currentOffset + difference.text.length,
+        );
+        currentOffset -= difference.text.length - 1;
+        continue;
+      }
+
+      if (difference.operation == DIFF_INSERT) {
+        attributedText = attributedText.insertString(
+          textToInsert: difference.text,
+          startOffset: currentOffset,
+        );
+        currentOffset += difference.text.length;
+        continue;
+      }
+    }
+    // place the new text
+    _currentSelectedTextNode!.text = attributedText;
+    // modify the cursor position
+    _selectPosition(
+      DocumentPosition(
+        nodeId: _currentSelectedTextNode!.id,
+        nodePosition: TextPosition(offset: cursorOffset),
+      ),
+    );
+  }
+
+  void _ensureCaretIsVisibleInViewport() {
     if (_currentCursorPosition != null && !_documentViewportRect.contains(_currentCursorPosition!)) {
       // adjust the viewport so the cursor is shown at its center.
       final double offset = _scrollController.offset + _currentCursorPosition!.dy - _documentViewportRect.center.dy;
@@ -1063,6 +1114,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
+  bool get _isFloatingCursorActive => _floatingCursorPosition != null;
+
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
     switch (point.state) {
@@ -1072,7 +1125,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
           // necessary to show the floating cursor before any updates.
           _floatingCursorPosition = _floatingCursorInitialPosition;
           _computeDocumentSize();
-          _ensureFloatingCursorIsVisibleOnStart();
+          _ensureCaretIsVisibleInViewport();
         });
         break;
       case FloatingCursorDragState.Update:
@@ -1089,6 +1142,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
         setState(() {
           _floatingCursorInitialPosition = null;
           _floatingCursorPosition = null;
+          _updateCurrentSelection();
         });
         break;
     }
@@ -1243,10 +1297,18 @@ class CharacterKeyEventData extends SoftKeyRawEventData {
 /*                                    UTIL                                    */
 /* -------------------------------------------------------------------------- */
 /// zero-width space character
-///
-/// This is used in the soft keyboard where it's added to indicate
-/// backspace events since they keyboard doesn't emit such events.
 const _zwsp = '\u200b';
+
+/// TextEditingValue that starts with zero-width space character
+///
+/// This is used in the soft keyboard where it's added at the beginning to indicate
+/// backspace events since they keyboard doesn't emit such events when backspace
+/// is pressed when there's no text (ie an empty node or at the beginning of a TextNode).
+/// This can also be used to delete other Nodes that does not contain text.
+const _zwspEditingValue = TextEditingValue(
+  text: _zwsp,
+  selection: TextSelection(baseOffset: 1, extentOffset: 1),
+);
 
 /* -------------------------------------------------------------------------- */
 /*                             SELECTION CONTROLS                             */
@@ -1470,3 +1532,91 @@ class _PointerPainter extends CustomPainter {
     return false;
   }
 }
+
+// General Notes:
+//
+//
+// ### Interactor + Layout:
+// - documentInteractor contains documentLayout which contains the actual document
+// - the documentInteractor can take the entire available width while the document layout is limited to the max width
+//   that is set by the editor.
+// - the documentLayout also has a padding around it.
+// - when calling _getDocOffset, we get the x,y coordinates inside in the document/layout coordinates which
+//   does not account for padding since it's outside the document and its layout.
+// - When we want to place the drag handles or show the floating cursor, we cannot place them inside the document since
+//   the document layout is passed as a child to the interactor with the padding around it.
+// - So technically, the drag handles and floating cursor are placed above the layout + padding
+//   (ie document wrapper which is a SizedBox).
+// - To place the drag handles correctly, we need to know the topLeft position of the layout as well as the wrapper
+//   (i.e. in global coordinates, wrapperTopLeft - layoutTopLeft == layoutPadding)
+// - here's a simplified view of the situation.
+//
+//            _________________________ toolbar/appbar _____________________
+//            |                                                            |
+//            |________________________   interactor   ____________________|
+//            |     ___________________     wrapper    ________________    |
+//            |    |                                                   |   |
+//            |    |    _______________ documentlayout  ____________   |   |
+//            |    |   |                                            |  |   |
+//            |    |   ┤~~~~~~~~~~   minWidth ~ maxWidth ~~~~~~~~~~~├  |   |
+//            |    |   |                                            |  |   |
+//            ┤~~~~~~~~~~~~~~~~~~~~   screen width ~~~~~~~~~~~~~~~~~~~~~~~~├
+//
+//    As seen above, the interactor can take whatever avaialble width and height.
+//    Typically the top padding has the same `top` position as the interactor.
+//    On the other hand, assuming the layout max width < screen width, the `left`
+//    position of the padding will be greater than that of the interactor.
+//
+//    Since the document, its layout and padding are given as a child to the interactor,
+//    placing drag handles relies on the padding's topLeft as origin.
+//    Hence whenever we're getting coordinates from the document (ie _getDocOffset), we need to
+//    account for the padding offset.
+//
+//    The good thing is that in a mobile application, the screen width is constant, so most
+//    of these values can be computed in the initState. While in Mobile, it's most likely that
+//    the padding x,y will be equal to the interactors x,y, the case can be different for tablets.
+//
+//    Since we're placing draghandles directly on the widget containing the padding/layout,
+//    the scroll offset is ignored when positining the handles. Though the scroll offset must
+//    be taken into account when dealing global position*.
+//
+//    * global position is preferred to avoid a converting mess between the different coordinates.
+//
+//    to summarize:
+//    - draghandles uses document coordinates with padding's as an offset (ie padding's coordinates)
+//    - selection controls can use either screen coordinates or can be enclosed in interactor's coordinates.
+//
+// #### Selection Controls
+// for selection controls widget/painter, see:
+// - material: flutter/lib/src/material/text_selection.dart -- MaterialTextSelectionControls
+// - cupertino: flutter/lib/src/cupertino/text_selection.dart -- CupertinoTextSelectionControls
+//
+// For floating cursor and other behavior, see EditableText implementation:
+// - flutter/lib/src/widgets/editable_text.dart
+//
+// ### TODOs:
+//  - selection of text with header has an issue
+//     => double tap a header word to be selected, drag the handle left or right and selection gets lost.
+//  - Understand the TextInputClient for different platformts to implement autocorrect/suggestion
+//  - Replace RawKeyEvent wrappers with commands since we don't really need to mimic keyboard events
+//    (initially i didn't know better)
+//  - resolve conflict between scroll gesture and vertical drag of draghandle.
+//    => when dragging a drag handle vertically, it'll scroll while it shouldn't.
+//  - floating cursor height should adapt based on the selection height or caret height.
+//  - add logging in a similar approach to the rest of this code base
+//  - add any necessary testing in a similar approach to the rest of this code base.
+//
+// waiting from upstream:
+//  - provide text height when calling `_layout.getRectForPosition`
+//    => this is important since we're currently placing both extent and base drag handles at the same level
+//       ideally the left handle should be on the top left of the selection while the right handle should be
+//       on the button right of the selection. Also, in iOS at least, the drag handle has a line that extends
+//       to the other end.
+//
+//
+// to keep in mind:
+//  - a lot of functionalities here were copied from documentInteractor so they should be consolidated if this
+//    is will get merged.
+
+// Unlike io.Platform, TargetPlatform, from the foundation library, detects the operating system on web.
+// hence, a softkeyboard is only true when the device is iOS or Android whether it's a native app or a Web app.

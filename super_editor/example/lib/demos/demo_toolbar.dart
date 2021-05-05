@@ -19,6 +19,7 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
   @override
   void initState() {
     super.initState();
+    _doc = _createSimpleDocument();
     _doc = _createSampleDocument();
     _docEditor = DocumentEditor(document: _doc);
     composer = DocumentComposer();
@@ -804,6 +805,32 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
 /* -------------------------------------------------------------------------- */
 /*                               SAMPLE DOCUMENT                              */
 /* -------------------------------------------------------------------------- */
+
+Document _createSimpleDocument() {
+  return MutableDocument(
+    nodes: [
+      ParagraphNode(
+        id: generateId(),
+        text: AttributedText(
+          text: 'One word.',
+        ),
+      ),
+      ParagraphNode(
+        id: generateId(),
+        text: AttributedText(
+          text: 'This is a simple paragraph with one sentence.',
+        ),
+      ),
+      ParagraphNode(
+        id: generateId(),
+        text: AttributedText(
+          text:
+              'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus sed sagittis urna. Aenean mattis ante justo, quis sollicitudin metus interdum id. Aenean ornare urna ac enim consequat mollis. In aliquet convallis efficitur. Phasellus convallis purus in fringilla scelerisque. Ut ac orci a turpis egestas lobortis. Morbi aliquam dapibus sem, vitae sodales arcu ultrices eu. Duis vulputate mauris quam, eleifend pulvinar quam blandit eget.',
+        ),
+      ),
+    ],
+  );
+}
 
 Document _createSampleDocument() {
   return MutableDocument(
