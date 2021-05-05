@@ -33,9 +33,13 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
   void initState() {
     super.initState();
 <<<<<<< HEAD
+<<<<<<< HEAD
     _doc = _createSimpleDocument();
 =======
 >>>>>>> 385830e (merged mobile branch)
+=======
+    _doc = _createSimpleDocument();
+>>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
     _doc = _createSampleDocument();
     _docEditor = DocumentEditor(document: _doc);
     composer = DocumentComposer();
@@ -1060,7 +1064,11 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
 /* -------------------------------------------------------------------------- */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 MutableDocument _createSimpleDocument() {
+=======
+Document _createSimpleDocument() {
+>>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
   return MutableDocument(
     nodes: [
       ParagraphNode(
@@ -1086,8 +1094,11 @@ MutableDocument _createSimpleDocument() {
   );
 }
 
+<<<<<<< HEAD
 MutableDocument _createSampleDocument() {
 =======
+=======
+>>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
 Document _createSampleDocument() {
 >>>>>>> 385830e (merged mobile branch)
   return MutableDocument(
