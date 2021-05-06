@@ -2,6 +2,8 @@
 import 'dart:math';
 import 'dart:ui';
 
+// waiting for null safety to be merged.
+// https://github.com/jheyne/diff-match-patch/pull/5
 import 'package:diff_match_patch/diff_match_patch.dart';
 
 import 'package:flutter/foundation.dart';
@@ -109,7 +111,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   late final Offset _wrapperTopLeft;
   // the top left position of the document in the global coordinate space
   late final Offset _documentTopLeft;
-
+  
+  // TODO: minimize the dance between the three coordinate spaces as much as possible
+  //       and try to rely sloley on the document coordinates. 
   // helper functions
   Offset get _documentPadding => (_documentTopLeft - _wrapperTopLeft);
   Offset _convertFromGlobalToDocument(Offset offset) => offset - _documentTopLeft + Offset(0, _scrollController.offset);
@@ -167,13 +171,14 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     _scrollController =
         _scrollController = (widget.scrollController ?? ScrollController())..addListener(_computeDocumentViewPort);
 
-    widget.editContext.composer.addListener(() {
-      // for some reason this method is being called three times each time a selection changes.
-      _onSelectionChange();
-    });
+    widget.editContext.composer.addListener(_onSelectionChange);
 
     if (!widget.readOnly) {
-      _attachTextInputClientForSoftKeyboard();
+      WidgetsBinding.instance!.addPostFrameCallback((timeStamp) {
+        // the keyboard needs to access the Theme.of(context).brightness
+        // to set the keyboard brightness according to the current Theme.
+        _attachTextInputClientForSoftKeyboard();
+      });
       _focusNode.addListener(_onFocusChange);
       // needed when selection == null to hide the soft keyboard
       widget.editContext.composer.addListener(_onFocusChange);
@@ -305,8 +310,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   DocumentSelection? _previousSelection;
   void _onSelectionChange() {
-    // for some reason on every selection change, this function is being called three times 
-    // hence we cache it to avoid repeating computations. 
+    // for some reason on every selection change, this method is being called multiple times
+    // from the composer. Hence we cache it to avoid repeating computations unnecessarily.
     if (_previousSelection == widget.editContext.composer.selection) {
       return;
     }
@@ -325,12 +330,24 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     _updateCurrentSelection();
   }
 
+  // This should be null when the node is not TextNode
+  // or the selection has multiple nodes even if all are TextNodes
+  // This value is primarly used for supporting autocorrect and
+  // suggetions which are handled at `_applyRemoteChanges`.
   TextNode? _currentSelectedTextNode;
   TextEditingValue _localTextEditingValue = _zwspEditingValue;
+  TextEditingValue? _lastKnownRemoteTextEditingValue;
+
+  // this is used during a batch edit or when the user inserts
+  // multiple characters at once. when the value is true,
+  // _setEditingState should not be invoked.
+  // TODO: this may not be necessary anymore if batches are
+  //       inserted directly through a single command
+  bool _isUpdatingEditingValue = false;
   void _updateCurrentSelection() {
     if (_isFloatingCursorActive || _isDragging) {
       // it's unncessary and computationally expensive to update during these activity.
-      //  Though but both activity should trigger this method once they're done.
+      // Consequently, both activities should trigger this method once they're done.
       return;
     }
     final selection = widget.editContext.composer.selection;
@@ -346,13 +363,14 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     if (selectedNodes.length > 1 || selectedNodes.first is! TextNode) {
       _localTextEditingValue = _zwspEditingValue;
       _currentSelectedTextNode = null;
+      _lastKnownRemoteTextEditingValue = null;
     } else {
       _currentSelectedTextNode = selectedNodes.first as TextNode;
       _localTextEditingValue = TextEditingValue(
         text: _zwsp + _currentSelectedTextNode!.text.text,
         selection: TextSelection(
-          baseOffset: (selection.base.nodePosition as TextPosition).offset + 1, // +1 for _zwsp
-          extentOffset: (selection.extent.nodePosition as TextPosition).offset + 1, // +1 for _zwsp
+          baseOffset: (selection.base.nodePosition as TextPosition).offset + _zwsp.length,
+          extentOffset: (selection.extent.nodePosition as TextPosition).offset + _zwsp.length,
         ),
       );
     }
@@ -362,9 +380,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   }
 
   void _setEditingState() {
-    // temp
     if (!_textInputConnection.attached) {
-      // should we connect and reinvoke _setEditingState?
+      // TODO: should we connect and reinvoke _setEditingState?
       return;
     }
 
@@ -408,12 +425,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   void _onTapDown(TapDownDetails details) {
     if (_isInsideDragHandle(details.globalPosition)) {
-      //  the code below is for debugging to test region selection by tapping on the drag handle.
-      // _selectRegion(
-      //   documentLayout: _layout,
-      //   baseOffset: _convertFromWrapperToDocument(_baseDragHandleRect!.center).translate(0, 5),
-      //   extentOffset: _convertFromWrapperToDocument(_extentDragHandleRect!.center).translate(0, 5),
-      // );
       return;
     }
     _log.log('_onTapDown', 'EditableDocument: onTapDown()');
@@ -534,7 +545,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       return;
     }
 
-    // to prevent hiding the drag handles when base == extent
+    // prevent hiding the drag handles when base == extent
+    // when the handles are being dragged.
     if (_isDragging && selection!.isCollapsed) {
       return;
     }
@@ -591,7 +603,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       return;
     }
 
-    // in document coordinates..
+    // this in document coordinates..
     _currentCursorPosition = _layout.getRectForPosition(selection.extent)?.center;
 
     late final Offset? selectionTopLeft;
@@ -601,7 +613,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       selectionTopLeft = _currentCursorPosition;
       selectionBottomRight = _currentCursorPosition;
     } else {
-      // text is still not factoring line height (see default_deitor/text.dart#_TextComponentState#getRectForPosition)
+      // text is still not factoring line height
+      // see: default_deitor/text.dart#_TextComponentState#getRectForPosition
       selectionTopLeft = _layout.getRectForPosition(selection.base)?.topLeft;
       selectionBottomRight = _layout.getRectForPosition(selection.extent)?.bottomRight;
     }
@@ -645,7 +658,6 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     double dx;
     double dy;
     final screenWidth = MediaQuery.of(context).size.width;
-
     if (baseOffset.dy == extentOffset.dy) {
       dy = baseOffset.dy - _scrollController.offset;
       dx = baseOffset.dx + ((extentOffset.dx - baseOffset.dx) / 2) + _interactorTopLeft.dx;
@@ -654,17 +666,12 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       // in a multi line selection, place selection controls in the center unless
       // the base handle > the center, then place it above the selected portion.
       dx = max(screenWidth / 2, baseOffset.dx + _interactorTopLeft.dx + 20);
-      // alternatively:
-      // dx = baseOffset.dx + layoutTopLeft.dx + 20;
     } else {
       dy = extentOffset.dy - _scrollController.offset;
       // in a multi line selection, place selection controls in the center unless
       // the extent handle > the center, then place it above the selected portion.
       dx = max(screenWidth / 2, extentOffset.dx + _interactorTopLeft.dx + 20);
-      // alternatively:
-      // dx = extentOffset.dx + layoutTopLeft.dx + 20;
     }
-    // final topPadding = MediaQuery.of(context).padding.top;
     dy = max(dy, max(_interactorTopLeft.dy, MediaQuery.of(context).padding.top));
 
     selectionControls.show(
@@ -702,33 +709,26 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     pasteWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: pasteKeyEvent);
   }
 
-  // TODO: replicate behavior from DocumentInteractor
+  // TODO: find good numbers (also choose clearer names)
   final _autoScrollArea = 50;
   final _scrollAmount = 10;
+
   // pass the document offset to scroll if necessary.
   //
-  // This is mainly used by the drag handles and floating cursor when either the
-  // selection or floating curosr is near the upper or lower boundries.
+  // This is mainly used by the drag handles and floating cursor when either one
+  // is near the upper or lower boundries.
   void _scrollIfNearBoundries(Offset documentOffset) {
     final scrollOffset = _scrollController.offset;
     if (documentOffset.dy - _autoScrollArea < _documentViewportRect.top) {
-      // don't scroll beyond begining
+      // prevent scrolling beyond the beginning
       if (scrollOffset <= 0) return;
-      _scrollController.jumpTo(
-        scrollOffset - _scrollAmount,
-        // duration: const Duration(milliseconds: 100),
-        // curve: Curves.easeOut,
-      );
+      _scrollController.jumpTo(scrollOffset - _scrollAmount);
       return;
     }
     if (documentOffset.dy > _documentViewportRect.bottom - _autoScrollArea) {
-      // don't scroll beyond end
+      // prevent scrolling beyond the end
       if (scrollOffset >= _scrollController.position.maxScrollExtent) return;
-      _scrollController.jumpTo(
-        scrollOffset + _scrollAmount,
-        // duration: const Duration(milliseconds: 100),
-        // curve: Curves.easeOut,
-      );
+      _scrollController.jumpTo(scrollOffset + _scrollAmount);
       return;
     }
   }
@@ -782,6 +782,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     );
   }
 
+  // TODO: improve how drag handles are implemented. The handle itself should not know
+  //       whether it's base or extent since what matter is whether it's right or left
+  //       In LTR text, the left handle is placed at the top of the selection whereas
+  //       the right handle is placed at the bottom, and vice versa for RTL text.
   Widget buildDragHandle(Rect rect, bool isBase, [Color color = Colors.blue]) {
     return Positioned.fromRect(
       rect: rect,
@@ -797,10 +801,11 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
             print('extentDragHandleRect! = $_extentDragHandleRect! && baseDragHandleRect! $_baseDragHandleRect!');
             return;
           }
-          // when the drag handles are near the document borders, their position can be outside the document boundries
-          // which will cause `_selectRegion` to return a null selection. To avoid such case, we clamp the drag handles
-          // positions to be slightly larger than lower boundries and slightly lower than the upper boundries.
-          // using +1 or -1 seems to work fine, lower numbers may work too but 1 seems reasonable.
+          // when the drag handles are near the document borders, their position can
+          // be outside the document boundries which will cause `_selectRegion` to return
+          // a null selection. To avoid such case, we clamp the drag handles positions to
+          // be slightly larger than lower boundries and slightly lower than the upper boundries.
+          // Shrinking the boundries by 1px seems to work fine.
           final dx = details.globalPosition.dx.clamp(
             _documentTopLeft.dx + 1,
             _documentTopLeft.dx + _documentSize.width - 1,
@@ -811,14 +816,18 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
             _documentTopLeft.dy - _scrollController.offset + _documentSize.height - 1,
           );
           final documentOffset = _convertFromGlobalToDocument(Offset(dx, dy));
-          // final documentOffset = _convertFromGlobalToDocument(details.globalPosition);
+
           if (isBase) {
             _selectRegion(
               documentLayout: _layout,
               baseOffset: documentOffset.translate(0, 5),
-              // since the text height is not included in _extentDragHandleRect, for larger fonts (e.g. header1, header2),
-              // the top position can move the selection one line up. We need to translate the position to be below
-              // the top boundry of the text height. While 5 is an arbitary number, it was tested on header1, 2, and 3.
+              // since the selection height is unknown, the top position can overlap
+              // with the line above the selection one line above. This will cause
+              // the selection to move up on every drag update even though it didn't
+              // actually move. This is mainly an issue with larger font sizes (H1 and H2).
+              // We need to translate the position to be just below the top boundry of the selection.
+              // While 5 is an arbitary number, it was tested on H1, H2, and H3 and seems to
+              // do the job for now until the selection height becomes known to us.
               extentOffset: _convertFromWrapperToDocument(_extentDragHandleRect!.center).translate(0, 5),
             );
           } else {
@@ -833,8 +842,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
           _scrollIfNearBoundries(documentOffset);
         },
         onPanCancel: () {
-          // this can be cancelled by a scroll event multiple time so we avoid setting state when is dragging is already
-          // false
+          // this is a temp work around until the conflict with scrolling is solved.
+          // due to the conflict, onPanCancel is invoked when the draghandle is dragged
+          // vertically where the scrolling takes over the gesture activity. so we avoid
+          //  setting state in that case when _isDragging is already false.
           if (_isDragging) {
             setState(() {
               _isDragging = false;
@@ -845,9 +856,11 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
         onPanEnd: (details) {
           setState(() {
             _isDragging = false;
-            // when selection is TextSelection where base.nodePosition.offset == extent.nodePosition.offset, but
-            // base.nodePosition.affinity != extent.nodePosition.affinity. In such case, selection.isCollapsed == false,
-            // although technically it's collapsed. This will make sure to collapse the selection.
+            // temp: when the selection is TextSelection where base.nodePosition.offset == extent.nodePosition.offset,
+            //       it's possible that base.nodePosition.affinity != extent.nodePosition.affinity which leads to
+            //       selection.isCollapsed == false. Hence, we check if the drag handles coincide, and if so, we
+            //       collapse the selection to hide the drag handles.
+            // note: once we've access to the selection heigt for textNode, the approach needs to change.
             if (_baseDragHandleRect?.center == _extentDragHandleRect?.center) {
               // collapse the selection
               _selectPosition(widget.editContext.composer.selection!.base);
@@ -871,16 +884,15 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     );
   }
 
-  // TODO: match the height of the carret which can be based on the fontSize for TextComponent,
-  //       box size for BoxComponent, and so on.
+  // TODO: match the height of the carret which once selection height is available
   final floatingCursorHeight = 15.0;
   Widget _buildFloatingCursor() {
-    // limit vertical movement inside the document
+    // boundry to limit vertical movement inside the document
     final topBound = _documentPadding.dy;
     final bottomBound = topBound + _documentSize.height - floatingCursorHeight;
     final top = max(topBound, min(bottomBound, _floatingCursorPosition!.dy));
 
-    // limit horizontal movement inside the document
+    // boundry to limit horizontal movement inside the document
     final leftBound = _documentPadding.dx;
     final rightBound = leftBound + _documentSize.width;
     final left = max(leftBound, min(rightBound, _floatingCursorPosition!.dx));
@@ -929,11 +941,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   }
 
   TextInputConfiguration _createTextInputConfiguration() {
-    // [bool needsAutofillConfiguration = false]
     return TextInputConfiguration(
       inputAction: TextInputAction.newline,
       inputType: TextInputType.text,
-      // keyboardAppearance: Theme.of(context).brightness,
+      keyboardAppearance: Theme.of(context).brightness,
       enableSuggestions: true,
       autocorrect: true,
     );
@@ -972,9 +983,8 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       case TextInputAction.route:
       case TextInputAction.emergencyCall:
       case TextInputAction.newline:
-        // since we are specifically using 'TextInputAction.newline',
-        // handling the action may not be necessary since a new line
-        // will be handled by update Editing Value.
+        // since we are only using 'TextInputAction.newline' for now,
+        // handling the newline is already done by updateEditingValue
         // _onKeyPressed(newLineKeyEvent);
         break;
     }
@@ -989,32 +999,33 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   @override
   void showAutocorrectionPromptRect(int start, int end) {
     // TODO: implement showAutocorrectionPromptRect
-    print('showAutocorrectionPromptRect');
+    //
+    // note: start and end are the offset within the _currentSelectedTextNode
+    //       keep in mind, because of the added _zwsp to remote value, subtract
+    //       "1" from the start.
   }
 
-  TextEditingValue? _lastKnownRemoteTextEditingValue;
-  // when true, _setEditingState should not be invoked.
-  bool _isUpdatingEditingValue = false;
   @override
   void updateEditingValue(TextEditingValue value) {
     _lastKnownRemoteTextEditingValue = value;
 
-    // when the floating cursor is moving, this method gets called but it should be ignored since 
-    // we are handling the floating cursor activity elsewhere 
+    // when the floating cursor is moving, this method gets called but it should be ignored since
+    // we are handling the floating cursor activity at updateFloatingCursor
     if (!_didRemoteTextEditingValueChange || _isFloatingCursorActive) {
       return;
     }
-    // backspace at the begining of the TextNode
+    // backspace at the begining of the node
     if (!value.text.contains(_zwsp)) {
       _onKeyPressed(backspaceKeyEvent);
-      // this is necessary for list item since deletion converts it into paragraph without triggering a 
-      // selection change.  
+      // this is necessary for list item since deletion converts it into paragraph without triggering a
+      // selection change.
       _updateCurrentSelection();
       return;
     }
 
-    // since soft return (ie shift+enter) is technically not supported in mobile, [TextNode]s won't contain
-    // newline as part of the text, and hence it's considered newLineKeyEvent
+    // since soft return (ie shift+enter) is technically not supported in mobile,
+    // none of the TextNodes will contain '\n' as part of the text, hence it's certainly
+    // a newline action.
     if (value.text.contains('\n')) {
       _onKeyPressed(newLineKeyEvent);
       return;
@@ -1022,79 +1033,85 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
     _isUpdatingEditingValue = true;
     // _currentSelectedTextNode being null indicates either the current selection isn't a TextNode
-    // or the current selection spans across multiple textNodes. In such case, the raw characters
-    // are sent as they are since textEditingValue should be = _zwspTextEditingValue + typed-characters.
-    // Given that the value is _zwspTextEditingValue, there won't be autocorrect or suggetion for this case.
+    // or the current selection spans across multiple textNodes/nodes. In such case, the raw characters
+    // are sent as they are.
+    // In this case, value == _zwspTextEditingValue + inserted-characters.
     if (_currentSelectedTextNode == null) {
       final newText = value.text.replaceAll(_zwsp, '');
-      newText.runes.forEach((rune) {
-        final event = SoftRawKeyDownEvent(data: CharacterKeyEventData(String.fromCharCode(rune)));
-        _onKeyPressed(event);
-      });
+      // TODO: move the caret beyond the text.
+      //       avoid looping over the text to insert one by one since a multi-codeUnits character
+      //       would cause an error.
+      final event = SoftRawKeyDownEvent(data: CharacterKeyEventData(newText));
+      _onKeyPressed(event);
     } else {
+      // handle the case when the change is within one TextNode.
+      // remote changes don't come in any specific order. An entire
+      // word can be replaced, a character can be added or removed at
+      // any position simultaneously since the text is being changed
+      // by the remote connection. These cases are mainly due to
+      // to autocorrect or suggestions or backspace's press & hold.
       _applyRemoteChanges();
     }
     _isUpdatingEditingValue = false;
   }
 
-  // remote changes don't come in any specific order. A word can be replaced, a character can be added or removed
-  // or part of the word can change only, mainly due to autocorrect or suggestions.
+  // TODO: convert this into an excutable command. e.g. BatchTextEditCommand
   void _applyRemoteChanges() {
     final localText = _localTextEditingValue.text.replaceFirst(_zwsp, '');
     final remoteText = _lastKnownRemoteTextEditingValue!.text.replaceFirst(_zwsp, '');
+    final caretPosition = _lastKnownRemoteTextEditingValue!.selection.extentOffset - _zwsp.length;
 
-    // find the difference between the new value and previous value.
-    final differences = diff(localText, remoteText);
+    // find the difference between the new local value and remote value.
+    //
+    // Note: This computation won't be expensive since at every call we are
+    //        dealing with one node (e.g. paragraph) and with a single change.
+    //        The difference won't be larger than a word or two, which is only
+    //        in the case of suggetion/autocorrect replacement. Typically, it's
+    //        a change of one letter (inser or delete).
+    final differences = diff(localText, remoteText, timeout: 0);
 
-    if (differences.length == 1) {
-      // there's no difference in this case.
-      return;
-    }
+    // get a copy of the current attributed text as an initial value
+    AttributedText attributedText = _currentSelectedTextNode!.text.copyText(0);
 
-    // after a character is inserted, the selection should be collapsed, hence base == extent
-    final cursorOffset = _lastKnownRemoteTextEditingValue!.selection.extentOffset - 1; // -1 for _zwsp removal
-
-    int currentOffset = 0;
-
-    // get a copy of the attributed text to prevent listeners from unnecessarly being notified
-    // which may cause undesirable behavior.
-    var attributedText = _currentSelectedTextNode!.text.copyText(0);
-
+    int runningOffset = 0;
     for (var difference in differences) {
       if (difference.operation == DIFF_EQUAL) {
-        currentOffset += difference.text.length;
+        runningOffset += difference.text.length;
         continue;
       }
 
       if (difference.operation == DIFF_DELETE) {
         attributedText = attributedText.removeRegion(
-          startOffset: currentOffset,
-          endOffset: currentOffset + difference.text.length,
+          startOffset: runningOffset,
+          endOffset: runningOffset + difference.text.length,
         );
-        currentOffset -= difference.text.length - 1;
         continue;
       }
 
       if (difference.operation == DIFF_INSERT) {
         attributedText = attributedText.insertString(
           textToInsert: difference.text,
-          startOffset: currentOffset,
+          startOffset: runningOffset,
+          applyAttributions: attributedText.getAllAttributionsAt(runningOffset - 1),
         );
-        currentOffset += difference.text.length;
+        runningOffset += difference.text.length;
         continue;
       }
     }
     // place the new text
+    // TODO: use a command to change the text through documentEditor.
     _currentSelectedTextNode!.text = attributedText;
-    // modify the cursor position
+    // place the caret at the correct position
     _selectPosition(
       DocumentPosition(
         nodeId: _currentSelectedTextNode!.id,
-        nodePosition: TextPosition(offset: cursorOffset),
+        nodePosition: TextPosition(offset: caretPosition),
       ),
     );
   }
 
+  // this is primarly used at the floating cursor start activity in case the cursor is outside
+  // the viewport.
   void _ensureCaretIsVisibleInViewport() {
     if (_currentCursorPosition != null && !_documentViewportRect.contains(_currentCursorPosition!)) {
       // adjust the viewport so the cursor is shown at its center.
@@ -1107,6 +1124,14 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
+  // This is primarly used during the floating cursor update activity to move the cursor to the
+  // correct position.
+  // TODO: Hide/show caret based on the floating cursor location.
+  //       In iOS, for instance, the caret is hidden when the floating cursor is above text.
+  //       On the other hand, when the floating cursor is outside the text boundry, the
+  //       the caret is shown again to indicate where it has landed.
+  //       Currently, we don't have control over hiding/showing the caret so it's shown
+  //       all the time.
   void _moveCaretTo(Offset documentOffset) {
     final docPosition = _layout.getDocumentPositionNearestToOffset(documentOffset);
     if (docPosition != null) {
@@ -1122,7 +1147,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       case FloatingCursorDragState.Start:
         setState(() {
           _floatingCursorInitialPosition = _convertFromDocumentToWrapper(_currentCursorPosition!);
-          // necessary to show the floating cursor before any updates.
+          // necessary to show the floating cursor before any updates are triggered
+          // i.e. the user pressed and hold the spacebar but didn't move the floating
+          //      cursor.
           _floatingCursorPosition = _floatingCursorInitialPosition;
           _computeDocumentSize();
           _ensureCaretIsVisibleInViewport();
@@ -1152,33 +1179,33 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 /* -------------------------------------------------------------------------- */
 /*                      Soft Keyboard Raw Event and Keys                      */
 /* -------------------------------------------------------------------------- */
-// mimicking keyboard events is easier than trying to reimplement all the functionalities that were already implemented
-// for the keyboard events such as: copy, paste, select all, delete char, insert char, etc.
+// mimicking keyboard events is easier than trying to reimplement all the functionalities
+// that were already implemented for the keyboard events such as: copy, paste, select all,
+// delete char, insert char, etc. Especially, most of existing public functions require a
+// `RawKeyDownEvent` as an argument, and the fact that most of the functionalities are
+// are implemented privately and are inaccessible from here. Ultimately, we need to execute
+// commands directly using documentEditor.
 //
-// Ideally, we should execute the commands directly using widget.editContext.editor.executeCommand(...command...).
-// Though, most of existing public functions require a `RawKeyDownEvent` as an argument while the functions that accepts
-// commands are private and cannot be reached from here.
-//
+// See `insertCharacterInTextComposable` in default_editor/text.dart for how `RawKeyDownEvent`
+// are being handled.
 //
 // the following section has three implementations to mimic a `RawKeyDownEvent`:
 //  - LogicalKeyboardKey  <=>   SoftKeyboardKey
 //  - RawKeyEventData     <=>   SoftKeyRawEventData
 //  - RawKeyDownEvent     <=>   SoftRawKeyDownEvent
 
+// -------------- INTERFACES
+
 class SoftKeyboardKey extends LogicalKeyboardKey {
-  // See `insertCharacterInTextComposable` in default_editor/text.dart,
-  //
-  // It uses keyEvent.logicalKey.keyLabel to check if the key label is a character
-  // then it uses `keyEvent.character` to insert that character.
-  //
-  // In the case below (and maybe in all cases) both values are equal.
-  //
-  // for now, a SoftKeyboardKey is created as a LogicalKeyboardKey where it only holds
-  // the character from CharacterKeyEventData as a keyLabel.
   const SoftKeyboardKey(String keyLabel)
-      : super(0x00000000, keyLabel: keyLabel); // zero since soft keyboard doesn't really have a keyId
+      // keyId = zero since soft keys doesn't really have a keyId
+      : super(0x00000000, keyLabel: keyLabel);
 }
 
+// Any KeyEvent that needs to mimic `isMetaPressed` must implement/extends this interface.
+// for some reason using RawKeyDownEvent directly (e.g. RawKeyDownEvent(CopyKeyEvent())).
+// returns false for isMetaPressed even though SoftKeyRawEventData.isMetaPressed is overriden
+// to return true (the raw_keyboard and logicalKeyboard classes have some known issues)
 abstract class SoftKeyRawEventData extends RawKeyEventData {
   const SoftKeyRawEventData();
   @override
@@ -1191,28 +1218,18 @@ abstract class SoftKeyRawEventData extends RawKeyEventData {
     return false;
   }
 
-  // this does not seem to be used anywhere in the package
+  // this isn't used anywhere in the super_editor, hence we place a none key.
   @override
   PhysicalKeyboardKey get physicalKey => PhysicalKeyboardKey.none;
 
-  // these two requires implementation
+  // requires implementation
   @override
   String get keyLabel;
 
+  // requires implementation
   @override
   LogicalKeyboardKey get logicalKey;
 }
-
-// this is necessary override for any SoftKeyboardRawEventData that needs to mimic `isMetaPressed`.
-// for some reason RawKeyDownEvent(CopyKeyEvent()) returns false for isMetaPressed even though
-// CopyKeyEvent.isMetaPressed == true.
-
-const copyKeyEvent = SoftRawKeyDownEvent(data: CopyKeyEvent());
-const selectAllKeyEvent = SoftRawKeyDownEvent(data: SelectAllKeyEvent());
-const pasteKeyEvent = SoftRawKeyDownEvent(data: PasteKeyEvent());
-const backspaceKeyEvent = RawKeyDownEvent(data: BackspaceKeyEventData());
-const newLineKeyEvent = RawKeyDownEvent(data: NewLineKeyEventData());
-// final deleteSelectionKey = const SoftRawKeyDownEvent(data: SelectAllKeyEvent());
 
 class SoftRawKeyDownEvent extends RawKeyDownEvent {
   const SoftRawKeyDownEvent({
@@ -1227,6 +1244,24 @@ class SoftRawKeyDownEvent extends RawKeyDownEvent {
   String get character => data.keyLabel;
 }
 
+// -------------- IMPLEMTNATIONS
+
+class CharacterKeyEventData extends SoftKeyRawEventData {
+  final String character;
+
+  const CharacterKeyEventData(this.character);
+
+  @override
+  String get keyLabel => character;
+
+  @override // cannot be const because each character is different
+  LogicalKeyboardKey get logicalKey => SoftKeyboardKey(character);
+}
+
+// action key events
+
+const copyKeyEvent = SoftRawKeyDownEvent(data: CopyKeyEvent());
+
 class CopyKeyEvent extends SoftKeyRawEventData {
   const CopyKeyEvent();
   @override
@@ -1238,6 +1273,8 @@ class CopyKeyEvent extends SoftKeyRawEventData {
   @override
   LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyC;
 }
+
+const pasteKeyEvent = SoftRawKeyDownEvent(data: PasteKeyEvent());
 
 class PasteKeyEvent extends SoftKeyRawEventData {
   const PasteKeyEvent();
@@ -1251,6 +1288,8 @@ class PasteKeyEvent extends SoftKeyRawEventData {
   LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyC;
 }
 
+const selectAllKeyEvent = SoftRawKeyDownEvent(data: SelectAllKeyEvent());
+
 class SelectAllKeyEvent extends SoftKeyRawEventData {
   const SelectAllKeyEvent();
   @override
@@ -1263,6 +1302,8 @@ class SelectAllKeyEvent extends SoftKeyRawEventData {
   LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyC;
 }
 
+const newLineKeyEvent = RawKeyDownEvent(data: NewLineKeyEventData());
+
 class NewLineKeyEventData extends SoftKeyRawEventData {
   const NewLineKeyEventData();
   @override
@@ -1272,6 +1313,8 @@ class NewLineKeyEventData extends SoftKeyRawEventData {
   LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.enter;
 }
 
+const backspaceKeyEvent = RawKeyDownEvent(data: BackspaceKeyEventData());
+
 class BackspaceKeyEventData extends SoftKeyRawEventData {
   const BackspaceKeyEventData();
   @override
@@ -1279,18 +1322,6 @@ class BackspaceKeyEventData extends SoftKeyRawEventData {
 
   @override
   LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.backspace;
-}
-
-class CharacterKeyEventData extends SoftKeyRawEventData {
-  final String character;
-
-  const CharacterKeyEventData(this.character);
-
-  @override
-  String get keyLabel => character;
-
-  @override // cannot be const because each character is different
-  LogicalKeyboardKey get logicalKey => SoftKeyboardKey(character);
 }
 
 /* -------------------------------------------------------------------------- */
