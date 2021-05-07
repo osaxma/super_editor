@@ -111,9 +111,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   late final Offset _wrapperTopLeft;
   // the top left position of the document in the global coordinate space
   late final Offset _documentTopLeft;
-  
+
   // TODO: minimize the dance between the three coordinate spaces as much as possible
-  //       and try to rely sloley on the document coordinates. 
+  //       and try to rely sloley on the document coordinates.
   // helper functions
   Offset get _documentPadding => (_documentTopLeft - _wrapperTopLeft);
   Offset _convertFromGlobalToDocument(Offset offset) => offset - _documentTopLeft + Offset(0, _scrollController.offset);
@@ -308,6 +308,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
+  // cache previous selection that's used for preventing unncessary computations
   DocumentSelection? _previousSelection;
   void _onSelectionChange() {
     // for some reason on every selection change, this method is being called multiple times
@@ -345,7 +346,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   //       inserted directly through a single command
   bool _isUpdatingEditingValue = false;
   void _updateCurrentSelection() {
-    if (_isFloatingCursorActive || _isDragging) {
+    if (widget.readOnly || _isFloatingCursorActive || _isDragging) {
       // it's unncessary and computationally expensive to update during these activity.
       // Consequently, both activities should trigger this method once they're done.
       return;
@@ -427,6 +428,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     if (_isInsideDragHandle(details.globalPosition)) {
       return;
     }
+
     _log.log('_onTapDown', 'EditableDocument: onTapDown()');
 
     final docOffset = _getDocOffset(details.localPosition);
@@ -438,6 +440,26 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       // Place the document selection at the location where the
       // user tapped.
       _selectPosition(docPosition);
+    } else {
+      // handle the user tapDown outside any of the nodes (e.g. empty space between nodes). 
+      // This is especially useful when a document contains one paragraph node that's empty
+      // it's tough for the user to find where to tap to get the cursor to show up. 
+      // 
+      // Currently, it'll place the selection at the end of the first node, if any.
+      //
+      // TODO: place the selection at the nearest node from where the user tapped
+      final nodes = widget.editContext.editor.document.nodes;
+      if (nodes.isNotEmpty) {
+        final firstNode = widget.editContext.editor.document.nodes.last;
+        final newSelection = DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: firstNode.id,
+            nodePosition: firstNode.endPosition,
+          ),
+        );
+        widget.editContext.composer.selection = newSelection;
+        _ensureCaretIsVisibleInViewport();
+      }
     }
 
     _focusNode.requestFocus();
