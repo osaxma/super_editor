@@ -1,4 +1,3 @@
-// ignore_for_file: omit_local_variable_types
 import 'dart:math';
 import 'dart:ui';
 
@@ -103,6 +102,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   late ScrollController _scrollController;
 
+  // TODO: should this be nullable? mainly because it's not initialized in read-only mode.
   late TextInputConnection _textInputConnection;
 
   // the top left position of the interactor in the global coordinate space
@@ -123,14 +123,11 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   // the height and width of the document layout.
   //
-  // this value is only used to determine the bottom boundry for scrolling
+  // this value is primarly used to determine the bottom boundry for scrolling
+  // and to prevent autoscrolling when the bottom is already visible.
   // This value should be updated at the start of any activity that needs it
-  // such as scrolling or floating cursor since it'll computing it for every
+  // such as scrolling or floating cursor since computing the value for every
   // selection change is unncessary.
-  //
-  // i.e. This value is used to prevent auto scrolling near the bottom boundry
-  //      caused by dragging selection or floating cursor updates when the bottom
-  //      is already visible.
   //
   // the value is updated by calling `_computeDocumentSize`.
   late Size _documentSize;
@@ -149,12 +146,14 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   final dragHandleSize = 20.0;
 
-  // indicates if the drag handle is being dragged.
+  // indicates if any of drag handles is being dragged.
   bool _isDragging = false;
 
-  // the initial position is used to update the floating cursor position since all the floating cursor updates
-  // are relative to the initial position from where the folating cursor started
-  // (i.e. _currentCursorPosition at the start of floatingCursor activity).
+  // the initial position is used to update the floating cursor position
+  // since all the floating cursor updates are relative to the initial
+  // position from where the folating cursor started.
+  // i.e. _currentCursorPosition = _floatingCursorInitialPosition only at
+  //       at the start of floatingCursor activity.
   Offset? _floatingCursorInitialPosition;
   Offset? _floatingCursorPosition;
 
@@ -174,9 +173,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     widget.editContext.composer.addListener(_onSelectionChange);
 
     if (!widget.readOnly) {
+      // the keyboard needs to access the Theme.of(context).brightness
+      // to set the keyboard brightness according to the current Theme
+      // which is not accessible before the first frame.
       WidgetsBinding.instance!.addPostFrameCallback((timeStamp) {
-        // the keyboard needs to access the Theme.of(context).brightness
-        // to set the keyboard brightness according to the current Theme.
         _attachTextInputClientForSoftKeyboard();
       });
       _focusNode.addListener(_onFocusChange);
@@ -308,15 +308,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
-  // cache previous selection that's used for preventing unncessary computations
-  DocumentSelection? _previousSelection;
   void _onSelectionChange() {
-    // for some reason on every selection change, this method is being called multiple times
-    // from the composer. Hence we cache it to avoid repeating computations unnecessarily.
-    if (_previousSelection == widget.editContext.composer.selection) {
-      return;
-    }
-    _previousSelection = widget.editContext.composer.selection;
     _log.log('_onSelectionChange', 'EditableDocument: _onSelectionChange()');
     // while most cases do not require a post frame call back, there are two cases that's requires
     // calling `_updateDragHandles` in a post frame to place drag handles appropriately:
@@ -441,10 +433,10 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       // user tapped.
       _selectPosition(docPosition);
     } else {
-      // handle the user tapDown outside any of the nodes (e.g. empty space between nodes). 
+      // handle the user tapDown outside any of the nodes (e.g. empty space between nodes).
       // This is especially useful when a document contains one paragraph node that's empty
-      // it's tough for the user to find where to tap to get the cursor to show up. 
-      // 
+      // it's tough for the user to find where to tap to get the cursor to show up.
+      //
       // Currently, it'll place the selection at the end of the first node, if any.
       //
       // TODO: place the selection at the nearest node from where the user tapped
@@ -727,6 +719,11 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     showSelectionControls();
   }
 
+  // TODO: fix the isuee when pasting a multiline content. Since in mobile we aren't supporting multiline
+  //       within a TextNode, we should split the pasted text based on '\n' and add each node 
+  //       individually. This could also be useful for parsing URLs and horziontal lines or quotes when pasted. 
+  //       for instance, if the text is surronded by quotation mark, it's a blockquote or if the text is "---" then
+  //       it's a horizontal divider, and if it's an image url, then it's an image and so on. 
   void _onPaste() {
     pasteWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: pasteKeyEvent);
   }
@@ -964,6 +961,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 
   TextInputConfiguration _createTextInputConfiguration() {
     return TextInputConfiguration(
+      // Using `TextInputAction.newline` will show the return symbol on the soft keyboard,
+      // but it'll allow inserting new lines in the remote textEditingValue. For this reason,
+      // newlines should be handled at `updateTextEditingValue` and not at `performAction`.
       inputAction: TextInputAction.newline,
       inputType: TextInputType.text,
       keyboardAppearance: Theme.of(context).brightness,
@@ -1007,7 +1007,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       case TextInputAction.newline:
         // since we are only using 'TextInputAction.newline' for now,
         // handling the newline is already done by updateEditingValue
-        // _onKeyPressed(newLineKeyEvent);
+        // since this action allows inserting new lines within the texts
         break;
     }
   }
@@ -1358,6 +1358,10 @@ const _zwsp = '\u200b';
 /// backspace events since they keyboard doesn't emit such events when backspace
 /// is pressed when there's no text (ie an empty node or at the beginning of a TextNode).
 /// This can also be used to delete other Nodes that does not contain text.
+///
+/// Known issue: Since `_zwsp` is the first character of the sentence, auto capitalization
+///              (i.e [TextCapitalization.sentences]) may not work appropriately for the
+///               first sentence only of a pargraph.
 const _zwspEditingValue = TextEditingValue(
   text: _zwsp,
   selection: TextSelection(baseOffset: 1, extentOffset: 1),

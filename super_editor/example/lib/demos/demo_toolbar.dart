@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
+// temp for migrating to the new Attribution API. 
+const noAttribution = NamedAttribution('');
+
 class ToolbarDemo extends StatefulWidget {
   @override
   _ToolbarDemoState createState() => _ToolbarDemoState();
@@ -93,13 +96,13 @@ class SelectionController with ChangeNotifier {
     document.nodes.forEach((element) {
       if (element is TextNode) {
         final alignment = element.metadata['textAlign'] ?? '';
-        final heading = element.metadata['blockType'] ?? '';
+        final heading = element.metadata['blockType'] ?? noAttribution;
         if (alignment.isEmpty) {
           // for now we assume it's left
           element.metadata['textAlign'] = 'left';
         }
-        if (heading.isEmpty) {
-          element.metadata['blockType'] = 'header3';
+        if (heading.id.isEmpty) {
+          element.metadata['blockType'] = header3Attribution;
         }
       }
     });
@@ -128,11 +131,11 @@ class SelectionController with ChangeNotifier {
   void setCurrentMetaData() {
     if (selectedNodes.isEmpty) {
       _currentAlignment = '';
-      _currentHeading = '';
+      _currentHeading = noAttribution;
       return;
     } else {
       _currentAlignment = getMetadataForSelectedTextNodes<String>('textAlign', 'left') ?? 'left';
-      _currentHeading = getMetadataForSelectedTextNodes<String>('blockType', 'header3') ?? 'header3';
+      _currentHeading = getMetadataForSelectedTextNodes<Attribution>('blockType', header3Attribution) ?? header3Attribution;
     }
   }
 
@@ -165,7 +168,7 @@ class SelectionController with ChangeNotifier {
   // bool get isMultiSelection => selectedNodes.length > 1;
 
   // helper functions
-  void _setAttributions(Set<String> attributions) {
+  void _setAttributions(Set<Attribution> attributions) {
     // if selection is collapsed or == null, skip.
     if (composer?.selection?.isCollapsed ?? true) return;
     final command = ToggleTextAttributionsCommand(
@@ -173,6 +176,8 @@ class SelectionController with ChangeNotifier {
       attributions: attributions,
     );
     documentEditor.executeCommand(command);
+    // toggling attribution doesn't update selection, so it's done manually
+    composer.notifyListeners();
   }
 
   void _setMetadata(TextNode node, String key, dynamic value) {
@@ -180,15 +185,15 @@ class SelectionController with ChangeNotifier {
   }
 
   void boldIt() {
-    _setAttributions({'bold'});
+    _setAttributions({boldAttribution});
   }
 
   void italicizeIt() {
-    _setAttributions({'italics'});
+    _setAttributions({italicsAttribution});
   }
 
   void strikethroughIt() {
-    _setAttributions({'strikethrough'});
+    _setAttributions({strikethroughAttribution});
   }
 
   /* -------------------------------------------------------------------------- */
@@ -196,11 +201,11 @@ class SelectionController with ChangeNotifier {
   /* -------------------------------------------------------------------------- */
 
   // ------------------------------ heading
-  String _currentHeading = '';
+  Attribution _currentHeading = noAttribution;
 
-  String get currentHeading => _currentHeading;
+  Attribution get currentHeading => _currentHeading;
 
-  void updateHeading(String heading) {
+  void updateHeading(Attribution heading) {
     final node = selectedNodes.first;
     if (node is TextNode) {
       _setMetadata(node, 'blockType', heading);
@@ -502,7 +507,7 @@ class HeaderMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentHeader = controller.currentHeading;
-    return DropdownButton<String>(
+    return DropdownButton<Attribution>(
       value: currentHeader,
       iconSize: 12,
       elevation: 16,
@@ -511,10 +516,10 @@ class HeaderMenu extends StatelessWidget {
         color: Colors.grey,
       ),
       style: TextStyle(color: Colors.black),
-      onChanged: (String newValue) {
+      onChanged: (Attribution newValue) {
         controller.updateHeading(newValue);
       },
-      items: currentHeader.isNotEmpty ? getItems() : null,
+      items: currentHeader.id.isNotEmpty ? getItems() : null,
     );
   }
 }
@@ -526,7 +531,7 @@ class TextHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var currentHeading = controller.currentHeading;
+    var currentHeading = controller.currentHeading?.id;
     if (currentHeading == null || currentHeading.isEmpty || currentHeading == 'header3') {
       currentHeading = 'H3';
     } else if (currentHeading.startsWith('header')) {
@@ -536,11 +541,11 @@ class TextHeading extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (currentHeading == 'H3') {
-          controller.updateHeading('header1');
+          controller.updateHeading(header1Attribution);
         } else if (currentHeading == 'H1') {
-          controller.updateHeading('header2');
+          controller.updateHeading(header2Attribution);
         } else {
-          controller.updateHeading('header3');
+          controller.updateHeading(header3Attribution);
         }
       },
       child: Container(
@@ -571,55 +576,50 @@ final defaultStyle = TextStyle(
 
 // copied from [Editor]
 /// Creates `TextStyles` for the standard `Editor`.
-TextStyle customStyleBuilder(Set<dynamic> attributions) {
+TextStyle customStyleBuilder(Set<Attribution> attributions) {
   var newStyle = defaultStyle;
 
   for (final attribution in attributions) {
-    if (attribution is! String) {
-      continue;
-    }
-
-    switch (attribution) {
-      case 'header1':
-        newStyle = newStyle.copyWith(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          height: 1.0,
-        );
-        break;
-      case 'header2':
-        newStyle = newStyle.copyWith(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          // color: const Color(0xFF888888),
-          height: 1.0,
-        );
-        break;
-      case 'blockquote':
-        newStyle = newStyle.copyWith(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          height: 1.4,
-          color: Colors.grey,
-        );
-        break;
-      case 'bold':
-        newStyle = newStyle.copyWith(
-          fontWeight: FontWeight.bold,
-        );
-        break;
-      case 'italics':
-        newStyle = newStyle.copyWith(
-          fontStyle: FontStyle.italic,
-        );
-        break;
-      case 'strikethrough':
-        newStyle = newStyle.copyWith(
-          decoration: TextDecoration.lineThrough,
-        );
-        break;
+    if (attribution == header1Attribution) {
+      newStyle = newStyle.copyWith(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        height: 1.0,
+      );
+    } else if (attribution == header2Attribution) {
+      newStyle = newStyle.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: const Color(0xFF888888),
+        height: 1.0,
+      );
+    } else if (attribution == blockquoteAttribution) {
+      newStyle = newStyle.copyWith(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        height: 1.4,
+        color: Colors.grey,
+      );
+    } else if (attribution == boldAttribution) {
+      newStyle = newStyle.copyWith(
+        fontWeight: FontWeight.bold,
+      );
+    } else if (attribution == italicsAttribution) {
+      newStyle = newStyle.copyWith(
+        fontStyle: FontStyle.italic,
+      );
+    } else if (attribution == strikethroughAttribution) {
+      newStyle = newStyle.copyWith(
+        decoration: TextDecoration.lineThrough,
+      );
+    } else if (attribution is LinkAttribution) {
+      newStyle = newStyle.copyWith(
+        color: Colors.lightBlue,
+        decoration: TextDecoration.underline,
+      );
     }
   }
+
   return newStyle;
 }
 
@@ -841,7 +841,7 @@ Document _createSampleDocument() {
           text: 'Example Document',
         ),
         metadata: {
-          'blockType': 'header1',
+          'blockType': header1Attribution,
         },
       ),
       HorizontalRuleNode(id: generateId()),
@@ -906,7 +906,7 @@ Document _createSampleDocument() {
                 'Nam hendrerit vitae elit ut placerat. Maecenas nec congue neque. Fusce eget tortor pulvinar, cursus neque vitae, sagittis lectus. Duis mollis libero eu scelerisque ullamcorper. Pellentesque eleifend arcu nec augue molestie, at iaculis dui rutrum. Etiam lobortis magna at magna pellentesque ornare. Sed accumsan, libero vel porta molestie, tortor lorem eleifend ante, at egestas leo felis sed nunc. Quisque mi neque, molestie vel dolor a, eleifend tempor odio.',
           ),
           metadata: {
-            'blockType': 'header2',
+            'blockType': header2Attribution,
           }),
     ],
   );
