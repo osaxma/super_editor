@@ -153,30 +153,24 @@ class _ViewerState extends State<Viewer> {
   @override
   Widget build(BuildContext context) {
     if (widget.ignoreInteractions) {
-      return SizedBox.expand(
-        child: SingleChildScrollView(
-          physics: const NeverScrollableScrollPhysics(),
-          child: Center(
-            child: SizedBox(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: widget.maxWidth,
-                ),
-                child: Padding(
-                  padding: widget.padding,
-                  child: DefaultDocumentLayout(
-                    key: _docLayoutKey,
-                    document: widget.editor.document,
-                    documentSelection: _composer.selection,
-                    componentBuilders: widget.componentBuilders,
-                    showCaret: false,
-                    extensions: {
-                      textStylesExtensionKey: widget.textStyleBuilder,
-                      selectionStylesExtensionKey: widget.selectionStyle,
-                    },
-                    showDebugPaint: widget.showDebugPaint,
-                  ),
-                ),
+      return SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Center(
+          child: SizedBox(
+            width: widget.maxWidth,
+            child: Padding(
+              padding: widget.padding,
+              child: DefaultDocumentLayout(
+                key: _docLayoutKey,
+                document: widget.editor.document,
+                documentSelection: _composer.selection,
+                componentBuilders: widget.componentBuilders,
+                showCaret: false,
+                extensions: {
+                  textStylesExtensionKey: widget.textStyleBuilder,
+                  selectionStylesExtensionKey: widget.selectionStyle,
+                },
+                showDebugPaint: widget.showDebugPaint,
               ),
             ),
           ),

@@ -46,7 +46,7 @@ Document _createInitialDocument() {
           text: 'Example Document',
         ),
         metadata: {
-          'blockType': 'header1',
+          'blockType': header1Attribution,
         },
       ),
        ParagraphNode(
@@ -63,7 +63,7 @@ Document _createInitialDocument() {
           text: 'مثال',
         ),
         metadata: {
-          'blockType': 'header1',
+          'blockType': header1Attribution,
         },
       ),
       HorizontalRuleNode(id: DocumentEditor.createNodeId()),

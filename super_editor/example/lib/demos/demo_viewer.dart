@@ -49,7 +49,7 @@ Document _createInitialDocument() {
           text: 'Example Document',
         ),
         metadata: {
-          'blockType': 'header1',
+          'blockType': header1Attribution,
         },
       ),
       HorizontalRuleNode(id: DocumentEditor.createNodeId()),
@@ -66,7 +66,7 @@ Document _createInitialDocument() {
           text: 'This is a blockquote!',
         ),
         metadata: {
-          'blockType': 'blockquote',
+          'blockType': blockquoteAttribution,
         },
       ),
       ListItemNode.unordered(

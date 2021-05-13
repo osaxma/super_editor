@@ -14,6 +14,7 @@ import 'demos/demo_document_loses_focus.dart';
 import 'demos/demo_switch_document_content.dart';
 import 'package:example/demos/demo_toolbar.dart';
 import 'demos/demo_viewer.dart';
+import 'demos/demo_viewer_listview.dart';
 
 /// Demo of a basic text editor, as well as various widgets that
 /// are available in this package.
@@ -143,6 +144,13 @@ class _HomeScreenState extends State<HomeScreen> {
 final _menu = <_MenuGroup>[
   _MenuGroup(
     items: [
+      _MenuItem(
+        icon: Icons.description,
+        title: 'Viewer ListView Demo',
+        pageBuilder: (context) {
+          return ExampleViewerListView();
+        },
+      ),
       _MenuItem(
         icon: Icons.description,
         title: 'Toolbar Demo',
