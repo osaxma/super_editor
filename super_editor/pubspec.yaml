@@ -21,7 +21,7 @@ dependencies:
   uuid: ^3.0.3
 
 
-  diff_match_patch: ^0.3.0
+  diff_match_patch: ^0.4.0
 
 
 dev_dependencies:

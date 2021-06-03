@@ -14,10 +14,10 @@ class ToolbarDemo extends StatefulWidget {
 }
 
 class _ToolbarDemoState extends State<ToolbarDemo> {
-  Document _doc;
-  DocumentEditor _docEditor;
-  DocumentComposer composer;
-  SelectionController controller;
+  late MutableDocument _doc;
+  late DocumentEditor _docEditor;
+  late DocumentComposer composer;
+  late SelectionController controller;
 
   @override
   void initState() {
@@ -51,7 +51,7 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
         children: [
           if (!isSoftKeyboard) toolbar,
           Expanded(
-            child: Editor.custom(
+            child: SuperEditor.custom(
               editor: controller.documentEditor,
               composer: controller.composer,
               maxWidth: 800,
@@ -118,7 +118,7 @@ class SelectionController with ChangeNotifier {
     selectedNodes.clear();
 
     if (composer.selection != null) {
-      selectedNodes.addAll(document.getNodesInside(composer.selection.base, composer.selection.extent));
+      selectedNodes.addAll(document.getNodesInside(composer.selection!.base, composer.selection!.extent));
     }
 
     _hasTextNode = selectedNodes.any((element) => element is TextNode);
@@ -143,7 +143,7 @@ class SelectionController with ChangeNotifier {
   /// - if all nodes share the same property, it'll return that property.
   /// - if any node has a different property, it'll return the given default value.
   /// - if no property is set or none of the nodes is a TextNode, it'll return null.
-  T getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
+  T? getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
     dynamic property;
     var foundFirst = false;
     for (var node in selectedNodes) {
@@ -170,9 +170,9 @@ class SelectionController with ChangeNotifier {
   // helper functions
   void _setAttributions(Set<Attribution> attributions) {
     // if selection is collapsed or == null, skip.
-    if (composer?.selection?.isCollapsed ?? true) return;
+    if (composer.selection?.isCollapsed ?? true) return;
     final command = ToggleTextAttributionsCommand(
-      documentSelection: composer.selection,
+      documentSelection: composer.selection!,
       attributions: attributions,
     );
     documentEditor.executeCommand(command);
@@ -203,9 +203,9 @@ class SelectionController with ChangeNotifier {
   // ------------------------------ heading
   Attribution _currentHeading = noAttribution;
 
-  Attribution get currentHeading => _currentHeading;
+  Attribution? get currentHeading => _currentHeading;
 
-  void updateHeading(Attribution heading) {
+  void updateHeading(Attribution? heading) {
     final node = selectedNodes.first;
     if (node is TextNode) {
       _setMetadata(node, 'blockType', heading);
@@ -308,8 +308,8 @@ class SelectionController with ChangeNotifier {
   void transformAllTextNodes(
     TextNode Function(TextNode previousNode) transformer,
   ) {
-    DocumentPosition base;
-    DocumentPosition extent;
+    late DocumentPosition base;
+    late DocumentPosition extent;
 
     // final isCollapsed = composer.selection.isCollapsed;
     final previousSelection = composer.selection;
@@ -322,11 +322,11 @@ class SelectionController with ChangeNotifier {
 
       if (i == 0) {
         composer.clearSelection();
-        base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection.base.nodePosition);
+        base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.base.nodePosition);
       }
 
       if (i == previousNodes.length - 1) {
-        extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection.extent.nodePosition);
+        extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.extent.nodePosition);
       }
 
       replaceNode(index, newNode);
@@ -336,9 +336,9 @@ class SelectionController with ChangeNotifier {
     composer.selection = DocumentSelection(base: base, extent: extent);
   }
 
-  void executeAll([bool Function(TextNode node) shouldSkip]) {
+  void executeAll([bool Function(TextNode node)? shouldSkip]) {
     for (var node in selectedNodes) {
-      if (shouldSkip != null && shouldSkip(node)) continue;
+      if (shouldSkip != null && shouldSkip.call(node as TextNode)) continue;
     }
   }
 
@@ -360,14 +360,14 @@ class SelectionController with ChangeNotifier {
   void insertDivider() {
     final node = selectedNodes.first;
     final index = document.getNodeIndex(node);
-    int insertionIndex;
+    int? insertionIndex;
 
     if (node is TextNode) {
       // insert the horizontal line based on the cursor position.
       // if it's closer to the beginning, insert above.
       // if it's closer to the end, insert below.
-      final begin = (composer.selection.base.nodePosition as TextPosition).offset;
-      final end = (composer.selection.extent.nodePosition as TextPosition).offset;
+      final begin = (composer.selection!.base.nodePosition as TextPosition).offset;
+      final end = (composer.selection!.extent.nodePosition as TextPosition).offset;
       final distanceFrombeginning = begin - node.beginningPosition.offset;
       final distanceToEnd = node.endPosition.offset - end;
       if (distanceToEnd < distanceFrombeginning) {
@@ -389,7 +389,7 @@ class SelectionController with ChangeNotifier {
 class Toolbar extends StatelessWidget {
   final SelectionController controller;
 
-  const Toolbar({Key key, @required this.controller}) : super(key: key);
+  const Toolbar({Key? key, required this.controller}) : super(key: key);
 
   IconData alignmentIcon(SelectionController controller) {
     switch (controller.currentAlignment) {
@@ -473,10 +473,10 @@ class Toolbar extends StatelessWidget {
 
 class ToolbarButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool enabled;
   final iconSize = 24.0;
-  const ToolbarButton({Key key, this.icon, this.onPressed, this.enabled = true}) : super(key: key);
+  const ToolbarButton({Key? key, required this.icon, this.onPressed, this.enabled = true}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -488,46 +488,46 @@ class ToolbarButton extends StatelessWidget {
   }
 }
 
-class HeaderMenu extends StatelessWidget {
-  final SelectionController controller;
+// class HeaderMenu extends StatelessWidget {
+//   final SelectionController controller;
 
-  final items = <String>['H1', 'H2', 'H3'].map<DropdownMenuItem<String>>((String value) {
-    return DropdownMenuItem<String>(
-      value: value.replaceAll('H', 'header'),
-      child: Text(value),
-    );
-  }).toList();
+//   final items = <String>['H1', 'H2', 'H3'].map<DropdownMenuItem<String>>((String value) {
+//     return DropdownMenuItem<String>(
+//       value: value.replaceAll('H', 'header'),
+//       child: Text(value),
+//     );
+//   }).toList();
 
-  List<DropdownMenuItem> getItems() {
-    // TODO insert an empty item for multi selection
-    return items;
-  }
+//   List<DropdownMenuItem> getItems() {
+//     // TODO insert an empty item for multi selection
+//     return items;
+//   }
 
-  HeaderMenu({Key key, this.controller}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    final currentHeader = controller.currentHeading;
-    return DropdownButton<Attribution>(
-      value: currentHeader,
-      iconSize: 12,
-      elevation: 16,
-      disabledHint: Icon(
-        Icons.horizontal_rule,
-        color: Colors.grey,
-      ),
-      style: TextStyle(color: Colors.black),
-      onChanged: (Attribution newValue) {
-        controller.updateHeading(newValue);
-      },
-      items: currentHeader.id.isNotEmpty ? getItems() : null,
-    );
-  }
-}
+//   HeaderMenu({Key? key, required this.controller}) : super(key: key);
+//   @override
+//   Widget build(BuildContext context) {
+//     final currentHeader = controller.currentHeading;
+//     return DropdownButton<Attribution>(
+//       value: currentHeader,
+//       iconSize: 12,
+//       elevation: 16,
+//       disabledHint: Icon(
+//         Icons.horizontal_rule,
+//         color: Colors.grey,
+//       ),
+//       style: TextStyle(color: Colors.black),
+//       onChanged: (Attribution? newValue) {
+//         controller.updateHeading(newValue);
+//       },
+//       items: currentHeader.id.isNotEmpty ? getItems() : null,
+//     );
+//   }
+// }
 
 class TextHeading extends StatelessWidget {
   final SelectionController controller;
 
-  TextHeading({Key key, this.controller}) : super(key: key);
+  TextHeading({Key? key, required this.controller}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -629,9 +629,9 @@ TextStyle customStyleBuilder(Set<Attribution> attributions) {
 
 extension TextNodeEx on TextNode {
   TextNode copyWith({
-    String id,
-    AttributedText text,
-    Map<String, dynamic> metadata,
+    String? id,
+    AttributedText? text,
+    Map<String, dynamic>? metadata,
   }) {
     return TextNode(
       id: id ?? this.id,
@@ -662,9 +662,9 @@ extension TextNodeEx on TextNode {
 // for this reason, when this is inserted in the editor componentBuilders, make sure it's above the paragraphBuilder!
 class BlockQuoteNode extends ParagraphNode {
   BlockQuoteNode({
-    String id,
-    AttributedText text,
-    Map<String, dynamic> metadata,
+    required String id,
+    required AttributedText text,
+    Map<String, dynamic>? metadata,
     int indent = 0,
   })  : _indent = indent,
         super(
@@ -685,10 +685,10 @@ class BlockQuoteNode extends ParagraphNode {
 
 class BlockQuoteComponent extends StatelessWidget {
   const BlockQuoteComponent({
-    Key key,
-    @required this.textKey,
-    @required this.text,
-    @required this.styleBuilder,
+    Key? key,
+    required this.textKey,
+    required this.text,
+    required this.styleBuilder,
     this.indent = 0,
     this.textSelection,
     this.selectionColor = Colors.lightBlueAccent,
@@ -705,7 +705,7 @@ class BlockQuoteComponent extends StatelessWidget {
   final AttributedText text;
   final AttributionStyleBuilder styleBuilder;
   final int indent;
-  final TextSelection textSelection;
+  final TextSelection? textSelection;
   final TextDirection textDirection;
   final TextAlign textAlign;
   final Color selectionColor;
@@ -717,7 +717,7 @@ class BlockQuoteComponent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    (textKey.currentState as State<TextComponent>);
+    (textKey.currentState as State<TextComponent>?);
     return Container(
       // color: Colors.grey.shade300,
       child: Row(
@@ -758,7 +758,7 @@ class BlockQuoteComponent extends StatelessWidget {
 
 // since BlockQuoteNode is also a ParagraphNode and TextNode, make sure this inserted above both of them in the
 // editor's componentBuilders
-Widget customBlockQuoteBuilder(ComponentContext componentContext) {
+Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
   final listItemNode = componentContext.documentNode;
   if (listItemNode is! BlockQuoteNode) {
     return null;
@@ -781,7 +781,7 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
       break;
   }
 
-  final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection;
+  final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection?;
   final showCaret = componentContext.showCaret && (componentContext.nodeSelection?.isExtent ?? false);
 
   final isPreviousBlockQuote = componentContext.document.getNodeBefore(componentContext.documentNode) is BlockQuoteNode;
@@ -806,7 +806,7 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
 /*                               SAMPLE DOCUMENT                              */
 /* -------------------------------------------------------------------------- */
 
-Document _createSimpleDocument() {
+MutableDocument _createSimpleDocument() {
   return MutableDocument(
     nodes: [
       ParagraphNode(
@@ -832,7 +832,7 @@ Document _createSimpleDocument() {
   );
 }
 
-Document _createSampleDocument() {
+MutableDocument _createSampleDocument() {
   return MutableDocument(
     nodes: [
       ParagraphNode(

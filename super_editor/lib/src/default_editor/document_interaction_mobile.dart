@@ -1,8 +1,6 @@
 import 'dart:math';
 import 'dart:ui';
 
-// waiting for null safety to be merged.
-// https://github.com/jheyne/diff-match-patch/pull/5
 import 'package:diff_match_patch/diff_match_patch.dart';
 
 import 'package:flutter/foundation.dart';
@@ -113,7 +111,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   late final Offset _documentTopLeft;
 
   // TODO: minimize the dance between the three coordinate spaces as much as possible
-  //       and try to rely sloley on the document coordinates.
+  //       and try to solely rely on the document coordinates.
   // helper functions
   Offset get _documentPadding => (_documentTopLeft - _wrapperTopLeft);
   Offset _convertFromGlobalToDocument(Offset offset) => offset - _documentTopLeft + Offset(0, _scrollController.offset);
@@ -324,10 +322,20 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   }
 
   // This should be null when the node is not TextNode
-  // or the selection has multiple nodes even if all are TextNodes
+  // or the selection has multiple nodes even if all of them are TextNodes
   // This value is primarly used for supporting autocorrect and
   // suggetions which are handled at `_applyRemoteChanges`.
   TextNode? _currentSelectedTextNode;
+  // At least in iOS, when more than one word is selected (excluding spaces),
+  // both autocorrect/suggetion are not presented. For this reason, when the selection
+  // contains a single text node only, the text is delegated to _localTextEditingValue
+  // to be handled remotely and which allow it to be handled in batches (e.g. autocorrect).
+  // In all other cases, _localTextEditingValue will be set as an empty value 
+  // (i.e. _zwspEditingValue to detect backspace events) without any text 
+  // since autocorrect/suggetion won't be presented anyway. In these cases,
+  // characters are inserted one by one 
+  //    e.g. - inserting a character when the selection spans across two paragraphs
+  //           or a non-text node is being selected. 
   TextEditingValue _localTextEditingValue = _zwspEditingValue;
   TextEditingValue? _lastKnownRemoteTextEditingValue;
 
@@ -387,9 +395,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     }
   }
 
-  // using _currentTextEditingValue == _lastKnownRemoteTextEditingValue directly is avoided since it compares
-  // affinity which was observed to be inaccurate and also it does not apply to the use case here since
-  // the differences in text and selection are only what matter.
+  // using _currentTextEditingValue == _lastKnownRemoteTextEditingValue directly
+  // is avoided since it compares affinity which can be different but are not important.
+  // Only the differences in text and selection are important in this use case.
   bool get _didRemoteTextEditingValueChange =>
       _lastKnownRemoteTextEditingValue == null ||
       _lastKnownRemoteTextEditingValue!.text != _localTextEditingValue.text ||
@@ -707,23 +715,24 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     // copy the text
     copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
     // delete the text
-    deleteExpandedSelectionWhenCharacterOrDestructiveKeyPressed(
+    anyCharacterOrDestructiveKeyToDeleteSelection(
         editContext: widget.editContext, keyEvent: backspaceKeyEvent);
     selectionControls.hide();
   }
 
   void _onSelectAll() {
-    selectAllWhenCmdAIsPressed(editContext: widget.editContext, keyEvent: selectAllKeyEvent);
+    print('select all called');
+    widget.editContext.commonOps.selectAll();
     // to move the selection controls in the new proper position.
     selectionControls.hide();
     showSelectionControls();
   }
 
   // TODO: fix the isuee when pasting a multiline content. Since in mobile we aren't supporting multiline
-  //       within a TextNode, we should split the pasted text based on '\n' and add each node 
-  //       individually. This could also be useful for parsing URLs and horziontal lines or quotes when pasted. 
+  //       within a TextNode, we should split the pasted text based on '\n' and add each node
+  //       individually. This could also be useful for parsing URLs and horziontal lines or quotes when pasted.
   //       for instance, if the text is surronded by quotation mark, it's a blockquote or if the text is "---" then
-  //       it's a horizontal divider, and if it's an image url, then it's an image and so on. 
+  //       it's a horizontal divider, and if it's an image url, then it's an image and so on.
   void _onPaste() {
     pasteWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: pasteKeyEvent);
   }
@@ -841,7 +850,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
               documentLayout: _layout,
               baseOffset: documentOffset.translate(0, 5),
               // since the selection height is unknown, the top position can overlap
-              // with the line above the selection one line above. This will cause
+              // with the line that is above the current the selection. This will cause
               // the selection to move up on every drag update even though it didn't
               // actually move. This is mainly an issue with larger font sizes (H1 and H2).
               // We need to translate the position to be just below the top boundry of the selection.
@@ -1024,7 +1033,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     //
     // note: start and end are the offset within the _currentSelectedTextNode
     //       keep in mind, because of the added _zwsp to remote value, subtract
-    //       "1" from the start.
+    //       "1" from the start and end.
   }
 
   @override
@@ -1045,6 +1054,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
       return;
     }
 
+    // TODO: let one `\n` act as a soft-return and `\n\n` act as a hard-return (e.g. new paragraph)
     // since soft return (ie shift+enter) is technically not supported in mobile,
     // none of the TextNodes will contain '\n' as part of the text, hence it's certainly
     // a newline action.
@@ -1083,13 +1093,13 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     final remoteText = _lastKnownRemoteTextEditingValue!.text.replaceFirst(_zwsp, '');
     final caretPosition = _lastKnownRemoteTextEditingValue!.selection.extentOffset - _zwsp.length;
 
-    // find the difference between the new local value and remote value.
+    // find the difference between the new remote value and the local value.
     //
     // Note: This computation won't be expensive since at every call we are
     //        dealing with one node (e.g. paragraph) and with a single change.
     //        The difference won't be larger than a word or two, which is only
     //        in the case of suggetion/autocorrect replacement. Typically, it's
-    //        a change of one letter (inser or delete).
+    //        a change of one letter (insert or delete).
     final differences = diff(localText, remoteText, timeout: 0);
 
     // get a copy of the current attributed text as an initial value
@@ -1127,7 +1137,7 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
     _selectPosition(
       DocumentPosition(
         nodeId: _currentSelectedTextNode!.id,
-        nodePosition: TextPosition(offset: caretPosition),
+        nodePosition: TextNodePosition(offset: caretPosition),
       ),
     );
   }
@@ -1219,9 +1229,9 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
 // -------------- INTERFACES
 
 class SoftKeyboardKey extends LogicalKeyboardKey {
-  const SoftKeyboardKey(String keyLabel)
+  const SoftKeyboardKey()
       // keyId = zero since soft keys doesn't really have a keyId
-      : super(0x00000000, keyLabel: keyLabel);
+      : super(0x00000000);
 }
 
 // Any KeyEvent that needs to mimic `isMetaPressed` must implement/extends this interface.
@@ -1277,7 +1287,7 @@ class CharacterKeyEventData extends SoftKeyRawEventData {
   String get keyLabel => character;
 
   @override // cannot be const because each character is different
-  LogicalKeyboardKey get logicalKey => SoftKeyboardKey(character);
+  LogicalKeyboardKey get logicalKey => SoftKeyboardKey();
 }
 
 // action key events
@@ -1307,11 +1317,11 @@ class PasteKeyEvent extends SoftKeyRawEventData {
   bool get isMetaPressed => true;
 
   @override
-  LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyC;
+  LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyV;
 }
 
+/* 
 const selectAllKeyEvent = SoftRawKeyDownEvent(data: SelectAllKeyEvent());
-
 class SelectAllKeyEvent extends SoftKeyRawEventData {
   const SelectAllKeyEvent();
   @override
@@ -1321,8 +1331,9 @@ class SelectAllKeyEvent extends SoftKeyRawEventData {
   bool get isMetaPressed => true;
 
   @override
-  LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyC;
-}
+  LogicalKeyboardKey get logicalKey => LogicalKeyboardKey.keyA;
+} 
+*/
 
 const newLineKeyEvent = RawKeyDownEvent(data: NewLineKeyEventData());
 
@@ -1460,6 +1471,8 @@ class SelectionControlsOverlay {
   }
 }
 
+// TODO: make it customizable -- at least in a similar manner
+//       to the selection controls of [SelectableText]
 class SelectionControls extends StatefulWidget {
   /// the center point based on the screen width
   final double centerPoint;

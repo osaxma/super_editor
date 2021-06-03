@@ -1,10 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'platform_detector.dart';
 
+bool _isMobile() => defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+
 extension PrimaryShortcutKey on RawKeyEvent {
   bool get isPrimaryShortcutKeyPressed =>
-      (Platform.instance.isMac && isMetaPressed) || (!Platform.instance.isMac && isControlPressed);
+      (Platform.instance.isMac && isMetaPressed) ||
+      (!Platform.instance.isMac && isControlPressed) ||
+      (_isMobile() && isMetaPressed);
 }
 
 /// On web, Flutter reports control character labels as
