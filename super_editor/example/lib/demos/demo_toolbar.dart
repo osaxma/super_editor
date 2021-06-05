@@ -18,16 +18,22 @@ class ToolbarDemo extends StatefulWidget {
 
 class _ToolbarDemoState extends State<ToolbarDemo> {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   late MutableDocument _doc;
   late DocumentEditor _docEditor;
   late DocumentComposer composer;
   late SelectionController controller;
+<<<<<<< HEAD
 =======
   Document _doc;
   DocumentEditor _docEditor;
   DocumentComposer composer;
   SelectionController controller;
 >>>>>>> 385830e (merged mobile branch)
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   @override
   void initState() {
@@ -69,10 +75,14 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
           if (!isSoftKeyboard) toolbar,
           Expanded(
 <<<<<<< HEAD
+<<<<<<< HEAD
             child: SuperEditor.custom(
 =======
             child: Editor.custom(
 >>>>>>> 385830e (merged mobile branch)
+=======
+            child: SuperEditor.custom(
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
               editor: controller.documentEditor,
               composer: controller.composer,
               maxWidth: 800,
@@ -149,10 +159,14 @@ class SelectionController with ChangeNotifier {
 
     if (composer.selection != null) {
 <<<<<<< HEAD
+<<<<<<< HEAD
       selectedNodes.addAll(document.getNodesInside(composer.selection!.base, composer.selection!.extent));
 =======
       selectedNodes.addAll(document.getNodesInside(composer.selection.base, composer.selection.extent));
 >>>>>>> 385830e (merged mobile branch)
+=======
+      selectedNodes.addAll(document.getNodesInside(composer.selection!.base, composer.selection!.extent));
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     }
 
     _hasTextNode = selectedNodes.any((element) => element is TextNode);
@@ -186,10 +200,14 @@ class SelectionController with ChangeNotifier {
   /// - if any node has a different property, it'll return the given default value.
   /// - if no property is set or none of the nodes is a TextNode, it'll return null.
 <<<<<<< HEAD
+<<<<<<< HEAD
   T? getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
 =======
   T getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
 >>>>>>> 385830e (merged mobile branch)
+=======
+  T? getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     dynamic property;
     var foundFirst = false;
     for (var node in selectedNodes) {
@@ -274,6 +292,7 @@ class SelectionController with ChangeNotifier {
   Attribution _currentHeading = noAttribution;
 
   Attribution? get currentHeading => _currentHeading;
+<<<<<<< HEAD
 
   void updateHeading(Attribution? heading) {
 =======
@@ -283,6 +302,10 @@ class SelectionController with ChangeNotifier {
 
   void updateHeading(String heading) {
 >>>>>>> 385830e (merged mobile branch)
+=======
+
+  void updateHeading(Attribution? heading) {
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     final node = selectedNodes.first;
     if (node is TextNode) {
       _setMetadata(node, 'blockType', heading);
@@ -386,12 +409,17 @@ class SelectionController with ChangeNotifier {
     TextNode Function(TextNode previousNode) transformer,
   ) {
 <<<<<<< HEAD
+<<<<<<< HEAD
     late DocumentPosition base;
     late DocumentPosition extent;
 =======
     DocumentPosition base;
     DocumentPosition extent;
 >>>>>>> 385830e (merged mobile branch)
+=======
+    late DocumentPosition base;
+    late DocumentPosition extent;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
     // final isCollapsed = composer.selection.isCollapsed;
     final previousSelection = composer.selection;
@@ -405,6 +433,7 @@ class SelectionController with ChangeNotifier {
       if (i == 0) {
         composer.clearSelection();
 <<<<<<< HEAD
+<<<<<<< HEAD
         base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.base.nodePosition);
       }
 
@@ -417,6 +446,13 @@ class SelectionController with ChangeNotifier {
       if (i == previousNodes.length - 1) {
         extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection.extent.nodePosition);
 >>>>>>> 385830e (merged mobile branch)
+=======
+        base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.base.nodePosition);
+      }
+
+      if (i == previousNodes.length - 1) {
+        extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.extent.nodePosition);
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
       }
 
       replaceNode(index, newNode);
@@ -427,6 +463,7 @@ class SelectionController with ChangeNotifier {
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   void executeAll([bool Function(TextNode node)? shouldSkip]) {
     for (var node in selectedNodes) {
       if (shouldSkip != null && shouldSkip.call(node as TextNode)) continue;
@@ -435,6 +472,11 @@ class SelectionController with ChangeNotifier {
     for (var node in selectedNodes) {
       if (shouldSkip != null && shouldSkip(node)) continue;
 >>>>>>> 385830e (merged mobile branch)
+=======
+  void executeAll([bool Function(TextNode node)? shouldSkip]) {
+    for (var node in selectedNodes) {
+      if (shouldSkip != null && shouldSkip.call(node as TextNode)) continue;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     }
   }
 
@@ -457,15 +499,20 @@ class SelectionController with ChangeNotifier {
     final node = selectedNodes.first;
     final index = document.getNodeIndex(node);
 <<<<<<< HEAD
+<<<<<<< HEAD
     int? insertionIndex;
 =======
     int insertionIndex;
 >>>>>>> 385830e (merged mobile branch)
+=======
+    int? insertionIndex;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
     if (node is TextNode) {
       // insert the horizontal line based on the cursor position.
       // if it's closer to the beginning, insert above.
       // if it's closer to the end, insert below.
+<<<<<<< HEAD
 <<<<<<< HEAD
       final begin = (composer.selection!.base.nodePosition as TextPosition).offset;
       final end = (composer.selection!.extent.nodePosition as TextPosition).offset;
@@ -473,6 +520,10 @@ class SelectionController with ChangeNotifier {
       final begin = (composer.selection.base.nodePosition as TextPosition).offset;
       final end = (composer.selection.extent.nodePosition as TextPosition).offset;
 >>>>>>> 385830e (merged mobile branch)
+=======
+      final begin = (composer.selection!.base.nodePosition as TextPosition).offset;
+      final end = (composer.selection!.extent.nodePosition as TextPosition).offset;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
       final distanceFrombeginning = begin - node.beginningPosition.offset;
       final distanceToEnd = node.endPosition.offset - end;
       if (distanceToEnd < distanceFrombeginning) {
@@ -495,10 +546,14 @@ class Toolbar extends StatelessWidget {
   final SelectionController controller;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   const Toolbar({Key? key, required this.controller}) : super(key: key);
 =======
   const Toolbar({Key key, @required this.controller}) : super(key: key);
 >>>>>>> 385830e (merged mobile branch)
+=======
+  const Toolbar({Key? key, required this.controller}) : super(key: key);
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   IconData alignmentIcon(SelectionController controller) {
     switch (controller.currentAlignment) {
@@ -583,6 +638,7 @@ class Toolbar extends StatelessWidget {
 class ToolbarButton extends StatelessWidget {
   final IconData icon;
 <<<<<<< HEAD
+<<<<<<< HEAD
   final VoidCallback? onPressed;
   final bool enabled;
   final iconSize = 24.0;
@@ -593,6 +649,12 @@ class ToolbarButton extends StatelessWidget {
   final iconSize = 24.0;
   const ToolbarButton({Key key, this.icon, this.onPressed, this.enabled = true}) : super(key: key);
 >>>>>>> 385830e (merged mobile branch)
+=======
+  final VoidCallback? onPressed;
+  final bool enabled;
+  final iconSize = 24.0;
+  const ToolbarButton({Key? key, required this.icon, this.onPressed, this.enabled = true}) : super(key: key);
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   @override
   Widget build(BuildContext context) {
@@ -605,6 +667,9 @@ class ToolbarButton extends StatelessWidget {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 // class HeaderMenu extends StatelessWidget {
 //   final SelectionController controller;
 
@@ -640,6 +705,7 @@ class ToolbarButton extends StatelessWidget {
 //     );
 //   }
 // }
+<<<<<<< HEAD
 =======
 class HeaderMenu extends StatelessWidget {
   final SelectionController controller;
@@ -677,11 +743,16 @@ class HeaderMenu extends StatelessWidget {
   }
 }
 >>>>>>> 385830e (merged mobile branch)
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
 class TextHeading extends StatelessWidget {
   final SelectionController controller;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   TextHeading({Key? key, required this.controller}) : super(key: key);
 
   @override
@@ -852,6 +923,7 @@ TextStyle customStyleBuilder(Set<dynamic> attributions) {
 extension TextNodeEx on TextNode {
   TextNode copyWith({
 <<<<<<< HEAD
+<<<<<<< HEAD
     String? id,
     AttributedText? text,
     Map<String, dynamic>? metadata,
@@ -860,6 +932,11 @@ extension TextNodeEx on TextNode {
     AttributedText text,
     Map<String, dynamic> metadata,
 >>>>>>> 385830e (merged mobile branch)
+=======
+    String? id,
+    AttributedText? text,
+    Map<String, dynamic>? metadata,
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   }) {
     return TextNode(
       id: id ?? this.id,
@@ -891,6 +968,7 @@ extension TextNodeEx on TextNode {
 class BlockQuoteNode extends ParagraphNode {
   BlockQuoteNode({
 <<<<<<< HEAD
+<<<<<<< HEAD
     required String id,
     required AttributedText text,
     Map<String, dynamic>? metadata,
@@ -899,6 +977,11 @@ class BlockQuoteNode extends ParagraphNode {
     AttributedText text,
     Map<String, dynamic> metadata,
 >>>>>>> 385830e (merged mobile branch)
+=======
+    required String id,
+    required AttributedText text,
+    Map<String, dynamic>? metadata,
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     int indent = 0,
   })  : _indent = indent,
         super(
@@ -920,16 +1003,22 @@ class BlockQuoteNode extends ParagraphNode {
 class BlockQuoteComponent extends StatelessWidget {
   const BlockQuoteComponent({
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     Key? key,
     required this.textKey,
     required this.text,
     required this.styleBuilder,
+<<<<<<< HEAD
 =======
     Key key,
     @required this.textKey,
     @required this.text,
     @required this.styleBuilder,
 >>>>>>> 385830e (merged mobile branch)
+=======
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     this.indent = 0,
     this.textSelection,
     this.selectionColor = Colors.lightBlueAccent,
@@ -947,10 +1036,14 @@ class BlockQuoteComponent extends StatelessWidget {
   final AttributionStyleBuilder styleBuilder;
   final int indent;
 <<<<<<< HEAD
+<<<<<<< HEAD
   final TextSelection? textSelection;
 =======
   final TextSelection textSelection;
 >>>>>>> 385830e (merged mobile branch)
+=======
+  final TextSelection? textSelection;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final TextDirection textDirection;
   final TextAlign textAlign;
   final Color selectionColor;
@@ -963,10 +1056,14 @@ class BlockQuoteComponent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 <<<<<<< HEAD
+<<<<<<< HEAD
     (textKey.currentState as State<TextComponent>?);
 =======
     (textKey.currentState as State<TextComponent>);
 >>>>>>> 385830e (merged mobile branch)
+=======
+    (textKey.currentState as State<TextComponent>?);
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     return Container(
       // color: Colors.grey.shade300,
       child: Row(
@@ -1008,10 +1105,14 @@ class BlockQuoteComponent extends StatelessWidget {
 // since BlockQuoteNode is also a ParagraphNode and TextNode, make sure this inserted above both of them in the
 // editor's componentBuilders
 <<<<<<< HEAD
+<<<<<<< HEAD
 Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
 =======
 Widget customBlockQuoteBuilder(ComponentContext componentContext) {
 >>>>>>> 385830e (merged mobile branch)
+=======
+Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final listItemNode = componentContext.documentNode;
   if (listItemNode is! BlockQuoteNode) {
     return null;
@@ -1035,10 +1136,14 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection?;
 =======
   final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection;
 >>>>>>> 385830e (merged mobile branch)
+=======
+  final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection?;
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final showCaret = componentContext.showCaret && (componentContext.nodeSelection?.isExtent ?? false);
 
   final isPreviousBlockQuote = componentContext.document.getNodeBefore(componentContext.documentNode) is BlockQuoteNode;
@@ -1065,10 +1170,14 @@ Widget customBlockQuoteBuilder(ComponentContext componentContext) {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 MutableDocument _createSimpleDocument() {
 =======
 Document _createSimpleDocument() {
 >>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
+=======
+MutableDocument _createSimpleDocument() {
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   return MutableDocument(
     nodes: [
       ParagraphNode(
@@ -1095,12 +1204,16 @@ Document _createSimpleDocument() {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 MutableDocument _createSampleDocument() {
 =======
 =======
 >>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
 Document _createSampleDocument() {
 >>>>>>> 385830e (merged mobile branch)
+=======
+MutableDocument _createSampleDocument() {
+>>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   return MutableDocument(
     nodes: [
       ParagraphNode(
