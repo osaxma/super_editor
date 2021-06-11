@@ -10,7 +10,7 @@ class ExampleViewerListView extends StatefulWidget {
 }
 
 class _ExampleViewerListViewState extends State<ExampleViewerListView> {
-  List<Document> docs;
+  late List<MutableDocument> docs;
 
   @override
   void initState() {
@@ -89,7 +89,7 @@ class _ExampleViewerListViewState extends State<ExampleViewerListView> {
   }
 }
 
-Document _createSampleDoc(List<DocumentNode> nodes) {
+MutableDocument _createSampleDoc(List<DocumentNode> nodes) {
   return MutableDocument(
     nodes: nodes,
   );

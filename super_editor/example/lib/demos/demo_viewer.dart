@@ -12,7 +12,7 @@ class ExampleViewer extends StatefulWidget {
 }
 
 class _ExampleViewerState extends State<ExampleViewer> {
-  Document _doc;
+  late MutableDocument _doc;
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _ExampleViewerState extends State<ExampleViewer> {
   }
 }
 
-Document _createInitialDocument() {
+MutableDocument _createInitialDocument() {
   return MutableDocument(
     nodes: [
       ImageNode(

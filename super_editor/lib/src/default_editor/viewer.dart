@@ -185,6 +185,11 @@ class _ViewerState extends State<Viewer> {
         editor: widget.editor,
         composer: _composer,
         getDocumentLayout: () => _docLayoutKey.currentState as DocumentLayout,
+        commonOps: CommonEditorOperations(
+          editor: widget.editor,
+          composer: _composer,
+          documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+        ),
       ),
       keyboardActions: widget.keyboardActions,
       showDebugPaint: widget.showDebugPaint,
