@@ -15,6 +15,7 @@ import 'demos/demo_switch_document_content.dart';
 import 'package:example/demos/demo_toolbar.dart';
 import 'demos/demo_viewer.dart';
 import 'demos/demo_viewer_listview.dart';
+import 'demos/demo_checkbox.dart';
 
 /// Demo of a basic text editor, as well as various widgets that
 /// are available in this package.
@@ -144,6 +145,13 @@ class _HomeScreenState extends State<HomeScreen> {
 final _menu = <_MenuGroup>[
   _MenuGroup(
     items: [
+      _MenuItem(
+        icon: Icons.description,
+        title: 'CheckBox Demo',
+        pageBuilder: (context) {
+          return CheckBoxDemo();
+        },
+      ),
       _MenuItem(
         icon: Icons.description,
         title: 'Viewer ListView Demo',
