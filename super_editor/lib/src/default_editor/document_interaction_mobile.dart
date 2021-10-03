@@ -1251,8 +1251,10 @@ abstract class SoftKeyRawEventData extends RawKeyEventData {
   }
 
   // this isn't used anywhere in the super_editor, hence we place a none key.
+  // new: the none key was removed from PhysicalKeyboardKey so we use nonConvert 
+  // (no reason -- just to make it work)
   @override
-  PhysicalKeyboardKey get physicalKey => PhysicalKeyboardKey.none;
+  PhysicalKeyboardKey get physicalKey => PhysicalKeyboardKey.nonConvert;
 
   // requires implementation
   @override
