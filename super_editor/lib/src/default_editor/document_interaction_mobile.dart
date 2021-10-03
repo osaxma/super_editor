@@ -707,13 +707,13 @@ class _SoftKeyboardDocumentInteractorState extends State<SoftKeyboardDocumentInt
   }
 
   void _onCopy() {
-    copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
+    copyWhenCmdCIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
     selectionControls.hide();
   }
 
   void _onCut() {
     // copy the text
-    copyWhenCmdVIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
+    copyWhenCmdCIsPressed(editContext: widget.editContext, keyEvent: copyKeyEvent);
     // delete the text
     anyCharacterOrDestructiveKeyToDeleteSelection(
         editContext: widget.editContext, keyEvent: backspaceKeyEvent);
