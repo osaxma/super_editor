@@ -5,47 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
-<<<<<<< HEAD
 // temp for migrating to the new Attribution API. 
 const noAttribution = NamedAttribution('');
 
-=======
->>>>>>> 385830e (merged mobile branch)
 class ToolbarDemo extends StatefulWidget {
   @override
   _ToolbarDemoState createState() => _ToolbarDemoState();
 }
 
 class _ToolbarDemoState extends State<ToolbarDemo> {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   late MutableDocument _doc;
   late DocumentEditor _docEditor;
   late DocumentComposer composer;
   late SelectionController controller;
-<<<<<<< HEAD
-=======
-  Document _doc;
-  DocumentEditor _docEditor;
-  DocumentComposer composer;
-  SelectionController controller;
->>>>>>> 385830e (merged mobile branch)
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   @override
   void initState() {
     super.initState();
-<<<<<<< HEAD
-<<<<<<< HEAD
     _doc = _createSimpleDocument();
-=======
->>>>>>> 385830e (merged mobile branch)
-=======
-    _doc = _createSimpleDocument();
->>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
     _doc = _createSampleDocument();
     _docEditor = DocumentEditor(document: _doc);
     composer = DocumentComposer();
@@ -74,15 +51,7 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
         children: [
           if (!isSoftKeyboard) toolbar,
           Expanded(
-<<<<<<< HEAD
-<<<<<<< HEAD
             child: SuperEditor.custom(
-=======
-            child: Editor.custom(
->>>>>>> 385830e (merged mobile branch)
-=======
-            child: SuperEditor.custom(
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
               editor: controller.documentEditor,
               composer: controller.composer,
               maxWidth: 800,
@@ -127,22 +96,13 @@ class SelectionController with ChangeNotifier {
     document.nodes.forEach((element) {
       if (element is TextNode) {
         final alignment = element.metadata['textAlign'] ?? '';
-<<<<<<< HEAD
         final heading = element.metadata['blockType'] ?? noAttribution;
-=======
-        final heading = element.metadata['blockType'] ?? '';
->>>>>>> 385830e (merged mobile branch)
         if (alignment.isEmpty) {
           // for now we assume it's left
           element.metadata['textAlign'] = 'left';
         }
-<<<<<<< HEAD
         if (heading.id.isEmpty) {
           element.metadata['blockType'] = header3Attribution;
-=======
-        if (heading.isEmpty) {
-          element.metadata['blockType'] = 'header3';
->>>>>>> 385830e (merged mobile branch)
         }
       }
     });
@@ -158,15 +118,7 @@ class SelectionController with ChangeNotifier {
     selectedNodes.clear();
 
     if (composer.selection != null) {
-<<<<<<< HEAD
-<<<<<<< HEAD
       selectedNodes.addAll(document.getNodesInside(composer.selection!.base, composer.selection!.extent));
-=======
-      selectedNodes.addAll(document.getNodesInside(composer.selection.base, composer.selection.extent));
->>>>>>> 385830e (merged mobile branch)
-=======
-      selectedNodes.addAll(document.getNodesInside(composer.selection!.base, composer.selection!.extent));
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     }
 
     _hasTextNode = selectedNodes.any((element) => element is TextNode);
@@ -179,19 +131,11 @@ class SelectionController with ChangeNotifier {
   void setCurrentMetaData() {
     if (selectedNodes.isEmpty) {
       _currentAlignment = '';
-<<<<<<< HEAD
       _currentHeading = noAttribution;
       return;
     } else {
       _currentAlignment = getMetadataForSelectedTextNodes<String>('textAlign', 'left') ?? 'left';
       _currentHeading = getMetadataForSelectedTextNodes<Attribution>('blockType', header3Attribution) ?? header3Attribution;
-=======
-      _currentHeading = '';
-      return;
-    } else {
-      _currentAlignment = getMetadataForSelectedTextNodes<String>('textAlign', 'left') ?? 'left';
-      _currentHeading = getMetadataForSelectedTextNodes<String>('blockType', 'header3') ?? 'header3';
->>>>>>> 385830e (merged mobile branch)
     }
   }
 
@@ -199,15 +143,7 @@ class SelectionController with ChangeNotifier {
   /// - if all nodes share the same property, it'll return that property.
   /// - if any node has a different property, it'll return the given default value.
   /// - if no property is set or none of the nodes is a TextNode, it'll return null.
-<<<<<<< HEAD
-<<<<<<< HEAD
   T? getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
-=======
-  T getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
->>>>>>> 385830e (merged mobile branch)
-=======
-  T? getMetadataForSelectedTextNodes<T>(String key, T defaultProperty) {
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     dynamic property;
     var foundFirst = false;
     for (var node in selectedNodes) {
@@ -232,7 +168,6 @@ class SelectionController with ChangeNotifier {
   // bool get isMultiSelection => selectedNodes.length > 1;
 
   // helper functions
-<<<<<<< HEAD
   void _setAttributions(Set<Attribution> attributions) {
     // if selection is collapsed or == null, skip.
     if (composer.selection?.isCollapsed ?? true) return;
@@ -243,16 +178,6 @@ class SelectionController with ChangeNotifier {
     documentEditor.executeCommand(command);
     // toggling attribution doesn't update selection, so it's done manually
     composer.notifyListeners();
-=======
-  void _setAttributions(Set<String> attributions) {
-    // if selection is collapsed or == null, skip.
-    if (composer?.selection?.isCollapsed ?? true) return;
-    final command = ToggleTextAttributionsCommand(
-      documentSelection: composer.selection,
-      attributions: attributions,
-    );
-    documentEditor.executeCommand(command);
->>>>>>> 385830e (merged mobile branch)
   }
 
   void _setMetadata(TextNode node, String key, dynamic value) {
@@ -260,7 +185,6 @@ class SelectionController with ChangeNotifier {
   }
 
   void boldIt() {
-<<<<<<< HEAD
     _setAttributions({boldAttribution});
   }
 
@@ -270,17 +194,6 @@ class SelectionController with ChangeNotifier {
 
   void strikethroughIt() {
     _setAttributions({strikethroughAttribution});
-=======
-    _setAttributions({'bold'});
-  }
-
-  void italicizeIt() {
-    _setAttributions({'italics'});
-  }
-
-  void strikethroughIt() {
-    _setAttributions({'strikethrough'});
->>>>>>> 385830e (merged mobile branch)
   }
 
   /* -------------------------------------------------------------------------- */
@@ -288,24 +201,11 @@ class SelectionController with ChangeNotifier {
   /* -------------------------------------------------------------------------- */
 
   // ------------------------------ heading
-<<<<<<< HEAD
   Attribution _currentHeading = noAttribution;
 
   Attribution? get currentHeading => _currentHeading;
-<<<<<<< HEAD
 
   void updateHeading(Attribution? heading) {
-=======
-  String _currentHeading = '';
-
-  String get currentHeading => _currentHeading;
-
-  void updateHeading(String heading) {
->>>>>>> 385830e (merged mobile branch)
-=======
-
-  void updateHeading(Attribution? heading) {
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     final node = selectedNodes.first;
     if (node is TextNode) {
       _setMetadata(node, 'blockType', heading);
@@ -408,18 +308,8 @@ class SelectionController with ChangeNotifier {
   void transformAllTextNodes(
     TextNode Function(TextNode previousNode) transformer,
   ) {
-<<<<<<< HEAD
-<<<<<<< HEAD
     late DocumentPosition base;
     late DocumentPosition extent;
-=======
-    DocumentPosition base;
-    DocumentPosition extent;
->>>>>>> 385830e (merged mobile branch)
-=======
-    late DocumentPosition base;
-    late DocumentPosition extent;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
     // final isCollapsed = composer.selection.isCollapsed;
     final previousSelection = composer.selection;
@@ -432,27 +322,11 @@ class SelectionController with ChangeNotifier {
 
       if (i == 0) {
         composer.clearSelection();
-<<<<<<< HEAD
-<<<<<<< HEAD
         base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.base.nodePosition);
       }
 
       if (i == previousNodes.length - 1) {
         extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.extent.nodePosition);
-=======
-        base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection.base.nodePosition);
-      }
-
-      if (i == previousNodes.length - 1) {
-        extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection.extent.nodePosition);
->>>>>>> 385830e (merged mobile branch)
-=======
-        base = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.base.nodePosition);
-      }
-
-      if (i == previousNodes.length - 1) {
-        extent = DocumentPosition(nodeId: newNode.id, nodePosition: previousSelection!.extent.nodePosition);
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
       }
 
       replaceNode(index, newNode);
@@ -462,21 +336,9 @@ class SelectionController with ChangeNotifier {
     composer.selection = DocumentSelection(base: base, extent: extent);
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   void executeAll([bool Function(TextNode node)? shouldSkip]) {
     for (var node in selectedNodes) {
       if (shouldSkip != null && shouldSkip.call(node as TextNode)) continue;
-=======
-  void executeAll([bool Function(TextNode node) shouldSkip]) {
-    for (var node in selectedNodes) {
-      if (shouldSkip != null && shouldSkip(node)) continue;
->>>>>>> 385830e (merged mobile branch)
-=======
-  void executeAll([bool Function(TextNode node)? shouldSkip]) {
-    for (var node in selectedNodes) {
-      if (shouldSkip != null && shouldSkip.call(node as TextNode)) continue;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     }
   }
 
@@ -498,32 +360,14 @@ class SelectionController with ChangeNotifier {
   void insertDivider() {
     final node = selectedNodes.first;
     final index = document.getNodeIndex(node);
-<<<<<<< HEAD
-<<<<<<< HEAD
     int? insertionIndex;
-=======
-    int insertionIndex;
->>>>>>> 385830e (merged mobile branch)
-=======
-    int? insertionIndex;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
     if (node is TextNode) {
       // insert the horizontal line based on the cursor position.
       // if it's closer to the beginning, insert above.
       // if it's closer to the end, insert below.
-<<<<<<< HEAD
-<<<<<<< HEAD
       final begin = (composer.selection!.base.nodePosition as TextPosition).offset;
       final end = (composer.selection!.extent.nodePosition as TextPosition).offset;
-=======
-      final begin = (composer.selection.base.nodePosition as TextPosition).offset;
-      final end = (composer.selection.extent.nodePosition as TextPosition).offset;
->>>>>>> 385830e (merged mobile branch)
-=======
-      final begin = (composer.selection!.base.nodePosition as TextPosition).offset;
-      final end = (composer.selection!.extent.nodePosition as TextPosition).offset;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
       final distanceFrombeginning = begin - node.beginningPosition.offset;
       final distanceToEnd = node.endPosition.offset - end;
       if (distanceToEnd < distanceFrombeginning) {
@@ -545,15 +389,7 @@ class SelectionController with ChangeNotifier {
 class Toolbar extends StatelessWidget {
   final SelectionController controller;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   const Toolbar({Key? key, required this.controller}) : super(key: key);
-=======
-  const Toolbar({Key key, @required this.controller}) : super(key: key);
->>>>>>> 385830e (merged mobile branch)
-=======
-  const Toolbar({Key? key, required this.controller}) : super(key: key);
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   IconData alignmentIcon(SelectionController controller) {
     switch (controller.currentAlignment) {
@@ -637,24 +473,10 @@ class Toolbar extends StatelessWidget {
 
 class ToolbarButton extends StatelessWidget {
   final IconData icon;
-<<<<<<< HEAD
-<<<<<<< HEAD
   final VoidCallback? onPressed;
   final bool enabled;
   final iconSize = 24.0;
   const ToolbarButton({Key? key, required this.icon, this.onPressed, this.enabled = true}) : super(key: key);
-=======
-  final VoidCallback onPressed;
-  final bool enabled;
-  final iconSize = 24.0;
-  const ToolbarButton({Key key, this.icon, this.onPressed, this.enabled = true}) : super(key: key);
->>>>>>> 385830e (merged mobile branch)
-=======
-  final VoidCallback? onPressed;
-  final bool enabled;
-  final iconSize = 24.0;
-  const ToolbarButton({Key? key, required this.icon, this.onPressed, this.enabled = true}) : super(key: key);
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
   @override
   Widget build(BuildContext context) {
@@ -666,10 +488,6 @@ class ToolbarButton extends StatelessWidget {
   }
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 // class HeaderMenu extends StatelessWidget {
 //   final SelectionController controller;
 
@@ -705,66 +523,15 @@ class ToolbarButton extends StatelessWidget {
 //     );
 //   }
 // }
-<<<<<<< HEAD
-=======
-class HeaderMenu extends StatelessWidget {
-  final SelectionController controller;
-
-  final items = <String>['H1', 'H2', 'H3'].map<DropdownMenuItem<String>>((String value) {
-    return DropdownMenuItem<String>(
-      value: value.replaceAll('H', 'header'),
-      child: Text(value),
-    );
-  }).toList();
-
-  List<DropdownMenuItem> getItems() {
-    // TODO insert an empty item for multi selection
-    return items;
-  }
-
-  HeaderMenu({Key key, this.controller}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    final currentHeader = controller.currentHeading;
-    return DropdownButton<String>(
-      value: currentHeader,
-      iconSize: 12,
-      elevation: 16,
-      disabledHint: Icon(
-        Icons.horizontal_rule,
-        color: Colors.grey,
-      ),
-      style: TextStyle(color: Colors.black),
-      onChanged: (String newValue) {
-        controller.updateHeading(newValue);
-      },
-      items: currentHeader.isNotEmpty ? getItems() : null,
-    );
-  }
-}
->>>>>>> 385830e (merged mobile branch)
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
 
 class TextHeading extends StatelessWidget {
   final SelectionController controller;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   TextHeading({Key? key, required this.controller}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     var currentHeading = controller.currentHeading?.id;
-=======
-  TextHeading({Key key, this.controller}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    var currentHeading = controller.currentHeading;
->>>>>>> 385830e (merged mobile branch)
     if (currentHeading == null || currentHeading.isEmpty || currentHeading == 'header3') {
       currentHeading = 'H3';
     } else if (currentHeading.startsWith('header')) {
@@ -774,19 +541,11 @@ class TextHeading extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (currentHeading == 'H3') {
-<<<<<<< HEAD
           controller.updateHeading(header1Attribution);
         } else if (currentHeading == 'H1') {
           controller.updateHeading(header2Attribution);
         } else {
           controller.updateHeading(header3Attribution);
-=======
-          controller.updateHeading('header1');
-        } else if (currentHeading == 'H1') {
-          controller.updateHeading('header2');
-        } else {
-          controller.updateHeading('header3');
->>>>>>> 385830e (merged mobile branch)
         }
       },
       child: Container(
@@ -817,7 +576,6 @@ final defaultStyle = TextStyle(
 
 // copied from [Editor]
 /// Creates `TextStyles` for the standard `Editor`.
-<<<<<<< HEAD
 TextStyle customStyleBuilder(Set<Attribution> attributions) {
   var newStyle = defaultStyle;
 
@@ -862,57 +620,6 @@ TextStyle customStyleBuilder(Set<Attribution> attributions) {
     }
   }
 
-=======
-TextStyle customStyleBuilder(Set<dynamic> attributions) {
-  var newStyle = defaultStyle;
-
-  for (final attribution in attributions) {
-    if (attribution is! String) {
-      continue;
-    }
-
-    switch (attribution) {
-      case 'header1':
-        newStyle = newStyle.copyWith(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          height: 1.0,
-        );
-        break;
-      case 'header2':
-        newStyle = newStyle.copyWith(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          // color: const Color(0xFF888888),
-          height: 1.0,
-        );
-        break;
-      case 'blockquote':
-        newStyle = newStyle.copyWith(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          height: 1.4,
-          color: Colors.grey,
-        );
-        break;
-      case 'bold':
-        newStyle = newStyle.copyWith(
-          fontWeight: FontWeight.bold,
-        );
-        break;
-      case 'italics':
-        newStyle = newStyle.copyWith(
-          fontStyle: FontStyle.italic,
-        );
-        break;
-      case 'strikethrough':
-        newStyle = newStyle.copyWith(
-          decoration: TextDecoration.lineThrough,
-        );
-        break;
-    }
-  }
->>>>>>> 385830e (merged mobile branch)
   return newStyle;
 }
 
@@ -922,21 +629,9 @@ TextStyle customStyleBuilder(Set<dynamic> attributions) {
 
 extension TextNodeEx on TextNode {
   TextNode copyWith({
-<<<<<<< HEAD
-<<<<<<< HEAD
     String? id,
     AttributedText? text,
     Map<String, dynamic>? metadata,
-=======
-    String id,
-    AttributedText text,
-    Map<String, dynamic> metadata,
->>>>>>> 385830e (merged mobile branch)
-=======
-    String? id,
-    AttributedText? text,
-    Map<String, dynamic>? metadata,
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   }) {
     return TextNode(
       id: id ?? this.id,
@@ -967,21 +662,9 @@ extension TextNodeEx on TextNode {
 // for this reason, when this is inserted in the editor componentBuilders, make sure it's above the paragraphBuilder!
 class BlockQuoteNode extends ParagraphNode {
   BlockQuoteNode({
-<<<<<<< HEAD
-<<<<<<< HEAD
     required String id,
     required AttributedText text,
     Map<String, dynamic>? metadata,
-=======
-    String id,
-    AttributedText text,
-    Map<String, dynamic> metadata,
->>>>>>> 385830e (merged mobile branch)
-=======
-    required String id,
-    required AttributedText text,
-    Map<String, dynamic>? metadata,
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     int indent = 0,
   })  : _indent = indent,
         super(
@@ -1002,23 +685,10 @@ class BlockQuoteNode extends ParagraphNode {
 
 class BlockQuoteComponent extends StatelessWidget {
   const BlockQuoteComponent({
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     Key? key,
     required this.textKey,
     required this.text,
     required this.styleBuilder,
-<<<<<<< HEAD
-=======
-    Key key,
-    @required this.textKey,
-    @required this.text,
-    @required this.styleBuilder,
->>>>>>> 385830e (merged mobile branch)
-=======
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     this.indent = 0,
     this.textSelection,
     this.selectionColor = Colors.lightBlueAccent,
@@ -1035,15 +705,7 @@ class BlockQuoteComponent extends StatelessWidget {
   final AttributedText text;
   final AttributionStyleBuilder styleBuilder;
   final int indent;
-<<<<<<< HEAD
-<<<<<<< HEAD
   final TextSelection? textSelection;
-=======
-  final TextSelection textSelection;
->>>>>>> 385830e (merged mobile branch)
-=======
-  final TextSelection? textSelection;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final TextDirection textDirection;
   final TextAlign textAlign;
   final Color selectionColor;
@@ -1055,15 +717,7 @@ class BlockQuoteComponent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-<<<<<<< HEAD
     (textKey.currentState as State<TextComponent>?);
-=======
-    (textKey.currentState as State<TextComponent>);
->>>>>>> 385830e (merged mobile branch)
-=======
-    (textKey.currentState as State<TextComponent>?);
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
     return Container(
       // color: Colors.grey.shade300,
       child: Row(
@@ -1104,15 +758,7 @@ class BlockQuoteComponent extends StatelessWidget {
 
 // since BlockQuoteNode is also a ParagraphNode and TextNode, make sure this inserted above both of them in the
 // editor's componentBuilders
-<<<<<<< HEAD
-<<<<<<< HEAD
 Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
-=======
-Widget customBlockQuoteBuilder(ComponentContext componentContext) {
->>>>>>> 385830e (merged mobile branch)
-=======
-Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final listItemNode = componentContext.documentNode;
   if (listItemNode is! BlockQuoteNode) {
     return null;
@@ -1135,15 +781,7 @@ Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
       break;
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection?;
-=======
-  final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection;
->>>>>>> 385830e (merged mobile branch)
-=======
-  final textSelection = componentContext.nodeSelection?.nodeSelection as TextSelection?;
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   final showCaret = componentContext.showCaret && (componentContext.nodeSelection?.isExtent ?? false);
 
   final isPreviousBlockQuote = componentContext.document.getNodeBefore(componentContext.documentNode) is BlockQuoteNode;
@@ -1168,16 +806,7 @@ Widget? customBlockQuoteBuilder(ComponentContext componentContext) {
 /*                               SAMPLE DOCUMENT                              */
 /* -------------------------------------------------------------------------- */
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 MutableDocument _createSimpleDocument() {
-=======
-Document _createSimpleDocument() {
->>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
-=======
-MutableDocument _createSimpleDocument() {
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   return MutableDocument(
     nodes: [
       ParagraphNode(
@@ -1203,17 +832,7 @@ MutableDocument _createSimpleDocument() {
   );
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 MutableDocument _createSampleDocument() {
-=======
-=======
->>>>>>> 31aac63 (preliminary support for autocorrect & suggestions (from mobile))
-Document _createSampleDocument() {
->>>>>>> 385830e (merged mobile branch)
-=======
-MutableDocument _createSampleDocument() {
->>>>>>> 1d0119b (catch up with upstream/main + cleanup (from mobile))
   return MutableDocument(
     nodes: [
       ParagraphNode(
@@ -1222,11 +841,7 @@ MutableDocument _createSampleDocument() {
           text: 'Example Document',
         ),
         metadata: {
-<<<<<<< HEAD
           'blockType': header1Attribution,
-=======
-          'blockType': 'header1',
->>>>>>> 385830e (merged mobile branch)
         },
       ),
       HorizontalRuleNode(id: generateId()),
@@ -1291,11 +906,7 @@ MutableDocument _createSampleDocument() {
                 'Nam hendrerit vitae elit ut placerat. Maecenas nec congue neque. Fusce eget tortor pulvinar, cursus neque vitae, sagittis lectus. Duis mollis libero eu scelerisque ullamcorper. Pellentesque eleifend arcu nec augue molestie, at iaculis dui rutrum. Etiam lobortis magna at magna pellentesque ornare. Sed accumsan, libero vel porta molestie, tortor lorem eleifend ante, at egestas leo felis sed nunc. Quisque mi neque, molestie vel dolor a, eleifend tempor odio.',
           ),
           metadata: {
-<<<<<<< HEAD
             'blockType': header2Attribution,
-=======
-            'blockType': 'header2',
->>>>>>> 385830e (merged mobile branch)
           }),
     ],
   );

@@ -62,7 +62,7 @@ class Viewer extends StatefulWidget {
       textStyleBuilder: textStyleBuilder ?? defaultStyleBuilder,
       selectionStyle: selectionStyle ?? defaultSelectionStyle,
       // in a view mode, only few commands are needed.
-      keyboardActions: keyboardActions ?? const [copyWhenCmdVIsPressed, selectAllWhenCmdAIsPressed],
+      keyboardActions: keyboardActions ?? const [copyWhenCmdCIsPressed, selectAllWhenCmdAIsPressed],
       scrollController: scrollController,
       focusNode: focusNode,
       maxWidth: maxWidth,

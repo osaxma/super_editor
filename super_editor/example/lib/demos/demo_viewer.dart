@@ -31,7 +31,7 @@ class _ExampleViewerState extends State<ExampleViewer> {
       document: _doc,
       maxWidth: 600,
       padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
-      keyboardActions: const [copyWhenCmdVIsPressed, selectAllWhenCmdAIsPressed],
+      keyboardActions: const [copyWhenCmdCIsPressed, selectAllWhenCmdAIsPressed],
     );
   }
 }

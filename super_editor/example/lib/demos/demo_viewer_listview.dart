@@ -62,7 +62,7 @@ class _ExampleViewerListViewState extends State<ExampleViewerListView> {
                       maxWidth: 600,
                       ignoreInteractions: true,
                       padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
-                      keyboardActions: const [copyWhenCmdVIsPressed, selectAllWhenCmdAIsPressed],
+                      keyboardActions: const [copyWhenCmdCIsPressed, selectAllWhenCmdAIsPressed],
                     ),
                   ),
                 );
@@ -82,7 +82,7 @@ class _ExampleViewerListViewState extends State<ExampleViewerListView> {
           document: doc,
           maxWidth: 600,
           padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
-          keyboardActions: const [copyWhenCmdVIsPressed, selectAllWhenCmdAIsPressed],
+          keyboardActions: const [copyWhenCmdCIsPressed, selectAllWhenCmdAIsPressed],
         ),
       );
     }));
