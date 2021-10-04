@@ -30,7 +30,7 @@ class DefaultDocumentLayout extends StatefulWidget {
     this.componentVerticalSpacing = 16,
     this.extensions = const {},
     this.showDebugPaint = false,
-    required this.readOnly,
+    this.readOnly = false,
   }) : super(key: key);
 
   /// The `Document` that this layout displays.
