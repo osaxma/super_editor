@@ -30,6 +30,7 @@ class DefaultDocumentLayout extends StatefulWidget {
     this.componentVerticalSpacing = 16,
     this.extensions = const {},
     this.showDebugPaint = false,
+    required this.readOnly,
   }) : super(key: key);
 
   /// The `Document` that this layout displays.
@@ -64,7 +65,10 @@ class DefaultDocumentLayout extends StatefulWidget {
   final Map<String, dynamic> extensions;
 
   /// Adds a debugging UI to the document layout, when true.
-  final bool showDebugPaint;
+  final bool showDebugPaint; 
+  
+  /// Whether or not the document is in a read-only state. 
+  final bool readOnly;
 
   @override
   _DefaultDocumentLayoutState createState() => _DefaultDocumentLayoutState();
@@ -443,6 +447,7 @@ class _DefaultDocumentLayoutState extends State<DefaultDocumentLayout> implement
         documentNode: docNode,
         componentKey: componentKey,
         showCaret: widget.showCaret,
+        readOnly: widget.readOnly,
         nodeSelection: nodeSelection,
         extensions: widget.extensions,
       ));

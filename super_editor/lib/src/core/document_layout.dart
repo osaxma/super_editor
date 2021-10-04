@@ -417,6 +417,7 @@ class ComponentContext {
     required this.documentNode,
     required this.componentKey,
     required this.showCaret,
+    required this.readOnly,
     this.nodeSelection,
     this.extensions = const {},
   });
@@ -448,6 +449,9 @@ class ComponentContext {
   /// image, but the components that do have a caret, e.g.,
   /// a paragraph, should respect this property.
   final bool showCaret;
+
+  /// Whether or not the document is in a read-only state.  
+  final bool readOnly;
 
   /// The current selected region within the [documentNode].
   ///

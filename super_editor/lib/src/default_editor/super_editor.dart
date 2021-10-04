@@ -101,13 +101,68 @@ class SuperEditor extends StatefulWidget {
     SelectionStyle? selectionStyle,
     List<DocumentKeyboardAction>? keyboardActions,
     List<ComponentBuilder>? componentBuilders,
-    this.componentVerticalSpacing = 16,
-    this.showDebugPaint = false,
-  })  : textStyleBuilder = textStyleBuilder ?? defaultStyleBuilder,
-        selectionStyle = selectionStyle ?? defaultSelectionStyle,
-        keyboardActions = keyboardActions ?? defaultKeyboardActions,
-        componentBuilders = componentBuilders ?? defaultComponentBuilders,
-        super(key: key);
+    ScrollController? scrollController,
+    FocusNode? focusNode,
+    double maxWidth = 600,
+    double componentVerticalSpacing = 16,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    GlobalKey? documentLayoutKey,
+    bool showDebugPaint = false,
+    bool showCaret = true,
+    bool readOnly = false,
+  }) {
+    return SuperEditor._(
+      key: key,
+      editor: editor,
+      composer: composer,
+      componentBuilders: componentBuilders ?? defaultComponentBuilders,
+      textStyleBuilder: textStyleBuilder ?? defaultStyleBuilder,
+      selectionStyle: selectionStyle ?? defaultSelectionStyle,
+      keyboardActions: keyboardActions ?? defaultKeyboardActions,
+      scrollController: scrollController,
+      focusNode: focusNode,
+      maxWidth: maxWidth,
+      componentVerticalSpacing: componentVerticalSpacing,
+      padding: padding,
+      documentLayoutKey: documentLayoutKey,
+      showDebugPaint: showDebugPaint,
+      showCaret: showCaret,
+      readOnly: readOnly,
+    );
+  }
+
+  factory SuperEditor.standardReadOnly({
+    Key? key,
+    required DocumentEditor editor,
+    DocumentComposer? composer,
+    ScrollController? scrollController,
+    FocusNode? focusNode,
+    double maxWidth = 600,
+    double componentVerticalSpacing = 16,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    GlobalKey? documentLayoutKey,
+    bool showDebugPaint = false,
+    bool showCaret = false,
+  }) {
+    return SuperEditor._(
+      key: key,
+      editor: editor,
+      composer: composer,
+      componentBuilders: defaultComponentBuilders,
+      textStyleBuilder: defaultStyleBuilder,
+      selectionStyle: defaultSelectionStyle,
+      keyboardActions: defaultKeyboardActionsForReadOnly,
+      scrollController: scrollController,
+      focusNode: focusNode,
+      maxWidth: maxWidth,
+      componentVerticalSpacing: componentVerticalSpacing,
+      padding: padding,
+      documentLayoutKey: documentLayoutKey,
+      showDebugPaint: showDebugPaint,
+      showCaret: showCaret,
+      readOnly: true,
+    );
+  }
 
   /// Creates a `Super Editor` with common (but configurable) defaults for
   /// visual components, text styles, and user interaction.
@@ -128,42 +183,9 @@ class SuperEditor extends StatefulWidget {
     List<ComponentBuilder>? componentBuilders,
     this.componentVerticalSpacing = 16,
     this.showDebugPaint = false,
-  })  : textStyleBuilder = textStyleBuilder ?? defaultStyleBuilder,
-        selectionStyle = selectionStyle ?? defaultSelectionStyle,
-        keyboardActions = keyboardActions ?? defaultKeyboardActions,
-        componentBuilders = componentBuilders ?? defaultComponentBuilders,
-        super(key: key);
-
-  /// [FocusNode] for the entire `SuperEditor`.
-  final FocusNode? focusNode;
-
-  /// Padding between the boundary of this `SuperEditor` and its
-  /// document content, i.e., insets the content of this document
-  /// by the given amount.
-  final EdgeInsetsGeometry padding;
-
-  /// The [ScrollController] that governs this `SuperEditor`'s scroll
-  /// offset.
-  ///
-  /// `scrollController` is not used if this `SuperEditor` has an ancestor
-  /// `Scrollable`.
-  final ScrollController? scrollController;
-
-  /// [GlobalKey] that's bound to the [DocumentLayout] within
-  /// this `SuperEditor`.
-  ///
-  /// This key can be used to lookup visual components in the document
-  /// layout within this `SuperEditor`.
-  final GlobalKey? documentLayoutKey;
-
-  /// The maximum width for document content within this `SuperEditor`.
-  final double maxWidth;
-
-  /// The `SuperEditor` input source, e.g., keyboard or Input Method Engine.
-  final DocumentInputSource inputSource;
-
-  /// The `SuperEditor` gesture mode, e.g., mouse or touch.
-  final DocumentGestureMode gestureMode;
+    this.showCaret = true,
+    this.readOnly = false,
+  }) : super(key: key);
 
   /// Contains a [Document] and alters that document as desired.
   final DocumentEditor editor;
@@ -199,6 +221,12 @@ class SuperEditor extends StatefulWidget {
   /// debugging, when true.
   final bool showDebugPaint;
 
+  /// Whether or not to show the blinking caret. 
+  final bool showCaret;
+
+  /// Whether or not the document is in a read-only state. 
+  final bool readOnly;
+  
   @override
   _SuperEditorState createState() => _SuperEditorState();
 }
@@ -318,9 +346,51 @@ class _SuperEditorState extends State<SuperEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildInputSystem(
-      child: _buildGestureSystem(
-        child: _buildDocumentLayout(),
+    return DocumentInteractor(
+      focusNode: _focusNode,
+      scrollController: widget.scrollController,
+      editContext: EditContext(
+        editor: widget.editor,
+        composer: _composer,
+        getDocumentLayout: () => _docLayoutKey.currentState as DocumentLayout,
+        commonOps: CommonEditorOperations(
+          editor: widget.editor,
+          composer: _composer,
+          documentLayoutResolver: () => _docLayoutKey.currentState as DocumentLayout,
+        ),
+      ),
+      keyboardActions: widget.keyboardActions,
+      showDebugPaint: widget.showDebugPaint,
+      document: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: widget.maxWidth,
+        ),
+        child: Padding(
+          padding: widget.padding,
+          child: MultiListenableBuilder(
+            listenables: {
+              _focusNode,
+              _composer,
+              widget.editor.document,
+            },
+            builder: (context) {
+              return DefaultDocumentLayout(
+                key: _docLayoutKey,
+                document: widget.editor.document,
+                documentSelection: _composer.selection,
+                componentBuilders: widget.componentBuilders,
+                showCaret: widget.showCaret && _focusNode.hasFocus,
+                readOnly: widget.readOnly,
+                componentVerticalSpacing: widget.componentVerticalSpacing,
+                extensions: {
+                  textStylesExtensionKey: widget.textStyleBuilder,
+                  selectionStylesExtensionKey: widget.selectionStyle,
+                },
+                showDebugPaint: widget.showDebugPaint,
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -511,4 +581,12 @@ final defaultKeyboardActions = <DocumentKeyboardAction>[
   anyCharacterOrDestructiveKeyToDeleteSelection,
   anyCharacterToInsertInParagraph,
   anyCharacterToInsertInTextContent,
+];
+
+/// Keyboard actions for a standard read-only [SuperEditor].
+final defaultKeyboardActionsForReadOnly = <DocumentKeyboardAction>[
+  doNothingWhenThereIsNoSelection,
+  copyWhenCmdCIsPressed,
+  selectAllWhenCmdAIsPressed,
+  expandSelectionWithShiftAndArrows,
 ];

@@ -597,3 +597,26 @@ ExecutionInstruction moveUpDownLeftAndRightWithArrowKeys({
 
   return didMove ? ExecutionInstruction.haltExecution : ExecutionInstruction.continueExecution;
 }
+
+// This instruction is mainly used for document read-only mode. 
+//
+// In a typical read-only mode, a selection is expanded with arrows only when: 
+// - "shift + any arrow" are pressed over an uncollapsed selection. 
+// 
+// This is the case because when arrows are pressed alone, they are supposed to
+// scroll the view. And when "shift + any arrow" are pressed over a collapsed selection,
+// nothing happens.
+ExecutionInstruction expandSelectionWithShiftAndArrows({
+  required EditContext editContext,
+  required RawKeyEvent keyEvent,
+}) {
+  // only expand a selection (when not collapsed) and shift is pressed. 
+  if (editContext.composer.selection != null &&
+      !editContext.composer.selection!.isCollapsed &&
+      keyEvent.isShiftPressed) {
+    // utilize the existing function which already checks for arrows 
+    return moveUpDownLeftAndRightWithArrowKeys(editContext: editContext, keyEvent: keyEvent);
+  } else {
+    return ExecutionInstruction.continueExecution;
+  }
+}
